@@ -1,0 +1,363 @@
+// Spelets nav: tillstånd, huvudloop och limmet mellan alla system.
+import { clamp, lerp, rand, TAU } from './math.js';
+import { Renderer, computeEnv } from './renderer.js';
+import { Input } from './input.js';
+import { Sound } from './audio.js';
+import { HUD } from './hud.js';
+import { Player } from './player.js';
+import { Enemy, WaveManager } from './enemies.js';
+import { Combat } from './combat.js';
+import { rollChoices } from './upgrades.js';
+import { terrainHeight, WATER_LEVEL } from './noise.js';
+
+const DAY_LENGTH = 320;   // sekunder per dygn
+
+export class Game {
+  constructor(canvas) {
+    this.canvas = canvas;
+    this.renderer = new Renderer(canvas);
+    this.particles = this.renderer.particles;
+    this.colliders = this.renderer.props.grid;
+    this.input = new Input(canvas);
+    this.sound = new Sound();
+    this.hud = new HUD();
+    this.combat = new Combat();
+    this.waves = new WaveManager();
+    this.player = new Player(this);
+    this.enemies = [];
+    this.state = 'menu';
+    this.worldId = 'wild';
+    this.usedLock = false;
+    this.best = this.loadBest();
+    this.fps = 60;
+    this.frameCount = 0;
+    this.resetRun();
+
+    this.input.onLockChange = (locked) => {
+      if (locked) this.usedLock = true;
+      else if (this.state === 'playing' && this.usedLock) this.pause();
+    };
+    canvas.addEventListener('mousedown', () => {
+      if (this.state === 'playing' && !this.input.locked && !this.input.touch) this.input.requestLock();
+    });
+    for (const el of document.querySelectorAll('.tBtn')) this.input.bindButton(el);
+  }
+
+  // ---------------------------------------------------------------- tillstånd
+
+  loadBest() {
+    try {
+      return JSON.parse(localStorage.getItem('dashh.best')) || { wave: 0, kills: 0 };
+    } catch (e) { return { wave: 0, kills: 0 }; }
+  }
+
+  saveBest() {
+    this.best.wave = Math.max(this.best.wave, this.waves.wave);
+    this.best.kills = Math.max(this.best.kills, this.kills);
+    try { localStorage.setItem('dashh.best', JSON.stringify(this.best)); } catch (e) { /* ignoreras */ }
+  }
+
+  resetRun() {
+    this.player.reset();
+    this.enemies.length = 0;
+    this.combat.reset();
+    this.waves.reset();
+    this.particles.list.length = 0;
+    this.upgradeLevels = new Map();
+    this.level = 1;
+    this.xp = 0;
+    this.xpNeeded = 12;
+    this.kills = 0;
+    this.elapsed = 0;
+    this.damageDealt = 0;
+    this.dayTime = 0.34;   // förmiddag — se computeEnv
+    this.time = 0;
+    this.pendingLevelUps = 0;
+    this.ambientTimer = 0;
+    this.hitstop = 0;
+    this.hud.clearFloaters();
+    this.hud.setBoss(null);
+  }
+
+  start(worldId) {
+    if (worldId) this.worldId = worldId;
+    this.renderer.buildWorld(this.worldId);
+    this.colliders = this.renderer.props.grid;
+    this.buildings = this.renderer.props.buildings || null;   // taksnipern behöver dem
+    this.sound.init();
+    this.sound.resume();
+    this.resetRun();
+    this.state = 'playing';
+    this.hud.hideOverlay();
+    this.hud.showHUD(true);
+    if (this.worldId === 'city') this.hud.showBanner('NEOTROPOLIS', 'håll mellanslag — flyg', 3);
+    else this.hud.showBanner('VILDHEIM', 'vågorna kommer');
+    this.input.enabled = true;
+    if (!this.input.touch) this.input.requestLock();
+  }
+
+  showMenu() {
+    this.state = 'menu';
+    this.input.enabled = false;
+    this.input.releaseLock();
+    this.hud.showHUD(false);
+    this.hud.showStart((w) => this.start(w), this.input.touch);
+  }
+
+  pause() {
+    if (this.state !== 'playing') return;
+    this.state = 'paused';
+    this.input.enabled = false;
+    this.input.releaseLock();
+    this.hud.showPause(() => this.resume());
+  }
+
+  resume() {
+    if (this.state !== 'paused') return;
+    this.state = 'playing';
+    this.input.enabled = true;
+    this.hud.hideOverlay();
+    if (!this.input.touch) this.input.requestLock();
+    this.sound.resume();
+  }
+
+  die() {
+    this.state = 'dead';
+    this.player.alive = false;
+    this.input.enabled = false;
+    this.input.releaseLock();
+    this.sound.gameOver();
+    this.particles.burst(this.player.pos.x, this.player.pos.y + 1.2, this.player.pos.z, 40, {
+      speed: 12, life: 1.1, size: 1.0, size2: 0.1, col: [0.4, 0.9, 1.0], alpha: 0.9, drag: 0.7, grav: -8,
+    });
+    this.saveBest();
+    setTimeout(() => {
+      if (this.state === 'dead') {
+        this.hud.showGameOver(this, () => this.start(), () => this.showMenu());
+      }
+    }, 900);
+  }
+
+  // ------------------------------------------------------- gränssnitt utåt
+
+  toast(msg) { this.hud.toast(msg); }
+
+  /** Kort frys vid tunga träffar — det är den som ger slaget tyngd. */
+  freeze(sec) { this.hitstop = Math.min(0.16, Math.max(this.hitstop, sec)); }
+
+  /** Skadesiffra som flyger upp ur fienden. */
+  floater(x, y, z, amount, crit, key) { this.hud.floater(x, y, z, amount, crit, key); }
+
+  spawnEnemy(type, x, z) {
+    const e = new Enemy(type, x, z, this.waves.wave, this.worldId);
+    this.enemies.push(e);
+    this.particles.burst(x, terrainHeight(x, z) + 1, z, e.boss ? 40 : 12, {
+      speed: e.boss ? 14 : 6, life: 0.6, size: e.boss ? 1.4 : 0.6,
+      col: e.col, alpha: 0.9, drag: 0.7, grav: -4,
+    });
+    if (e.boss) {
+      const city = this.worldId === 'city';
+      this.hud.setBoss(e, city ? 'OVERSEER' : 'VOIDLORD');
+      this.hud.showBanner('BOSS', city ? 'overseer aktiveras' : 'voidlord stiger upp', 3);
+      this.sound.bossSpawn();
+      this.player.shake = 1.2;
+    }
+    return e;
+  }
+
+  spawnEnemyBullet(e, target, speed, dmg) { this.combat.enemyBullet(e, target, speed, dmg); }
+  spawnEnemyBulletDir(e, dx, dy, dz, speed, dmg) { this.combat.enemyBulletDir(e, dx, dy, dz, speed, dmg); }
+  shockwave(x, y, z, r, dmg) { this.combat.shockwave(this, x, y, z, r, dmg); }
+
+  onEnemyKilled(e) {
+    this.kills++;
+    this.sound.kill();
+    this.particles.burst(e.pos.x, e.pos.y + e.height * 0.5, e.pos.z, e.boss ? 60 : 16, {
+      speed: e.boss ? 16 : 8, life: e.boss ? 1.2 : 0.55, size: e.boss ? 1.5 : 0.6, size2: 0.1,
+      col: e.col, alpha: 0.95, drag: 0.7, grav: -6,
+    });
+    this.combat.dropLoot(this, e);
+    this.player.shake = Math.min(1.2, this.player.shake + (e.boss ? 1.0 : 0.12));
+    if (e.boss) {
+      this.hud.setBoss(null);
+      this.hud.showBanner('BOSSEN FÖLL', '', 2.6);
+      this.player.shake = 1.0;
+    }
+  }
+
+  addXP(n) {
+    this.xp += n;
+    while (this.xp >= this.xpNeeded) {
+      this.xp -= this.xpNeeded;
+      this.level++;
+      this.xpNeeded = Math.round(12 + this.level * 7 + Math.pow(this.level, 1.7));
+      this.pendingLevelUps++;
+    }
+    if (this.pendingLevelUps > 0 && this.state === 'playing') this.openLevelUp();
+  }
+
+  openLevelUp() {
+    this.state = 'levelup';
+    this.input.enabled = false;
+    this.input.releaseLock();
+    this.sound.levelUp();
+    this.choices = rollChoices(this.upgradeLevels, 3);
+    this.hud.showLevelUp(this.level, this.choices, (i) => this.pickUpgrade(i));
+  }
+
+  pickUpgrade(i) {
+    const u = this.choices[i];
+    if (!u) return;
+    u.apply(this.player.stats, this.player);
+    this.upgradeLevels.set(u.id, (this.upgradeLevels.get(u.id) || 0) + 1);
+    this.toast(`${u.icon} ${u.name}`);
+    this.pendingLevelUps--;
+    this.sound.pickup();
+    if (this.pendingLevelUps > 0) { this.openLevelUp(); return; }
+    this.state = 'playing';
+    this.input.enabled = true;
+    this.hud.hideOverlay();
+    if (!this.input.touch) this.input.requestLock();
+  }
+
+  onWaveStart(wave, isBoss) {
+    this.hud.showBanner(`VÅG ${wave}`, isBoss ? 'något stort närmar sig' : '');
+    this.sound.waveStart();
+  }
+
+  onWaveClear(wave) {
+    this.hud.showBanner('VÅGEN RENSAD', 'nästa startar snart', 2.0);
+    this.toast(`Våg ${wave} klarad`);
+    this.player.heal(this.player.stats.maxHp * 0.08);
+  }
+
+  // ------------------------------------------------------------------ update
+
+  update(dt) {
+    this.time += dt;
+    this.elapsed += dt;
+    this.dayTime = (this.dayTime + dt / DAY_LENGTH) % 1;
+
+    const p = this.player;
+    p.update(dt, this.input, this);
+
+    // attack: svärd i Vildheim, laser i Neotropolis
+    if (this.input.fireDown && p.fireTimer <= 0) {
+      if (this.worldId === 'wild') this.combat.swordSwing(this);
+      else this.combat.playerShoot(this);
+    } else p.aimDir(this.enemies);
+
+    // eldboll på C (bara Vildheim, 10 s nedkylning)
+    if (this.worldId === 'wild' && this.input.pressed('KeyC') && p.alive) {
+      if (p.fireballCd <= 0) this.combat.castFireball(this);
+      else this.toast(`🔥 Eldboll om ${Math.ceil(p.fireballCd)} s`);
+    }
+
+    // drönare
+    if (p.stats.drones > 0 && p.droneTimer <= 0) {
+      let target = null, bestD = 46;
+      for (const e of this.enemies) {
+        if (!e.alive) continue;
+        const d = Math.hypot(e.pos.x - p.pos.x, e.pos.z - p.pos.z);
+        if (d < bestD) { bestD = d; target = e; }
+      }
+      if (target) {
+        for (let i = 0; i < p.stats.drones; i++) {
+          const a = p.droneAngle + (i / p.stats.drones) * TAU;
+          this.combat.droneShoot(this, p.pos.x + Math.cos(a) * 2.1, p.pos.y + 2.4, p.pos.z + Math.sin(a) * 2.1, target);
+        }
+        p.droneTimer = 1.15;
+      } else p.droneTimer = 0.3;
+    }
+
+    this.waves.update(dt, this);
+
+    for (const e of this.enemies) {
+      if (e.alive) e.update(dt, this);
+      else if (e.death > 0) e.updateDeath(dt, this);
+    }
+    if (this.enemies.some((e) => !e.alive && e.death <= 0)) {
+      this.enemies = this.enemies.filter((e) => e.alive || e.death > 0);
+    }
+
+    this.combat.update(dt, this);
+    this.particles.update(dt);
+
+    // stämningspartiklar: gnistor på dagen, glödmott på natten
+    this.ambientTimer -= dt;
+    if (this.ambientTimer <= 0) {
+      this.ambientTimer = 0.06;
+      const env = this.env || computeEnv(this.dayTime, this.worldId);
+      const night = env.night;
+      const a = rand(TAU), d = rand(6, 34);
+      const x = p.pos.x + Math.cos(a) * d, z = p.pos.z + Math.sin(a) * d;
+      const gh = terrainHeight(x, z);
+      this.particles.spawn({
+        x, y: Math.max(gh, WATER_LEVEL) + rand(0.4, 5), z,
+        vx: rand(-0.4, 0.4), vy: rand(0.1, 0.7), vz: rand(-0.4, 0.4),
+        life: rand(1.6, 3.4), size: rand(0.10, 0.24), size2: 0,
+        col: night > 0.4 ? [0.45, 0.95, 0.8] : [1.0, 0.95, 0.75],
+        alpha: night > 0.4 ? 0.75 : 0.3, drag: 0.05,
+      });
+    }
+
+    if (!p.alive && this.state === 'playing') this.die();
+  }
+
+  // ------------------------------------------------------------------ render
+
+  render() {
+    const r = this.renderer;
+    const p = this.player;
+    this.env = computeEnv(this.dayTime, this.worldId);
+    r.clearBatches();
+    if (p.alive) p.draw(r, this.time);
+    for (const e of this.enemies) e.draw(r, this.time);
+    this.combat.draw(r, this.time);
+    r.render(p.camera(this.time), this.env, this.time, p.pos);
+  }
+
+  // -------------------------------------------------------------------- loop
+
+  frame(now) {
+    const dt = Math.min(0.05, (now - (this.lastTime || now)) / 1000);
+    this.lastTime = now;
+    this.frameCount++;
+    this.fps = lerp(this.fps, 1 / Math.max(dt, 0.0001), 0.1);
+
+    if (this.state === 'playing') {
+      if (this.input.pressed('Escape') || this.input.pressed('KeyP')) this.pause();
+      else if (this.hitstop > 0) this.hitstop -= dt;   // världen står still, bilden rullar
+      else this.update(dt);
+    } else if (this.state === 'paused') {
+      if (this.input.pressed('Escape') || this.input.pressed('KeyP')) this.resume();
+    } else if (this.state === 'levelup') {
+      for (let i = 0; i < 3; i++) {
+        if (this.input.pressed(`Digit${i + 1}`) || this.input.pressed(`Numpad${i + 1}`)) {
+          this.pickUpgrade(i);
+          break;
+        }
+      }
+      this.particles.update(dt * 0.25);
+    } else {
+      // meny eller game over: låt världen leva vidare i bakgrunden
+      this.time += dt;
+      this.dayTime = (this.dayTime + dt / DAY_LENGTH) % 1;
+      this.particles.update(dt);
+      if (this.state !== 'dead') {
+        this.player.camYaw += dt * 0.06;
+        this.player.updateCamera(dt, 0);
+      }
+    }
+
+    if (this.state !== 'menu') this.hud.update(this, dt);
+    this.render();
+    this.input.endFrame();
+    requestAnimationFrame((t) => this.frame(t));
+  }
+
+  run() {
+    this.player.updateCamera(0.016, 0);
+    requestAnimationFrame((t) => this.frame(t));
+  }
+}

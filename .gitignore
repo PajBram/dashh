@@ -1,0 +1,5 @@
+# Byggresultat. `python3 tools/bundle.py` återskapar det ur src/ när som helst,
+# och den fil som ligger publikt bor i rastegar.se-repot.
+dist/
+
+.DS_Store

@@ -1,0 +1,95 @@
+# DASHH: Voidfall
+
+Ett 3D arena-survivalspel i tredjeperson som körs i webbläsaren. Ligger som beta
+på <https://rastegar.se/games/dashh/>.
+
+**Ägare:** Paj (pajam98@hotmail.com). **Inte utvecklare** — förklara tekniska val
+i klarspråk på svenska och säg tydligt till när Paj behöver göra något själv.
+
+**Språk:** svenska överallt — mot Paj, i spelets gränssnitt, i kodkommentarer och
+i den här filen. Commit-meddelanden på engelska. Att spelet är svenskt medan
+rastegar.se i övrigt är engelsk är ett medvetet beslut, dokumenterat i sajtens
+egen CLAUDE.md. **Översätt inte spelet.**
+
+---
+
+## Bärande principer
+
+1. **Noll beroenden.** Ren WebGL2 och vanilla ES-moduler. Inget npm, inga
+   bibliotek, inga byggverktyg utöver `tools/bundle.py`, inga bildfiler och inga
+   ljudfiler. Maskinen saknar `node` — allt som kräver det är uteslutet.
+2. **Allt genereras i kod.** Varje mesh, terräng, byggnad, monster och ljud
+   skapas proceduralt när sidan laddas. Lägg inte till assets.
+3. **Två världar, en motor.** `WORLD_ID` i `noise.js` styr terräng och regler.
+   Vildheim är vildmark med svärd; Neotropolis är neonstad där man flyger och
+   skjuter laser. Det som skiljer dem ska ligga bakom `worldId`, inte i kopierad
+   kod.
+4. **Mus och tumme är likvärdiga.** Allt måste gå att spela både med
+   tangentbord/mus och med touch. Touchknappar trycker samma virtuella tangenter
+   som tangentbordet, så spelogiken slipper veta om fingrar.
+
+---
+
+## Kommandon
+
+```bash
+python3 -m http.server 8123      # kör src/ direkt, öppna http://localhost:8123
+python3 tools/bundle.py          # bygg enfilsversionen dist/dashh.html
+```
+
+`dist/` är byggresultat och ligger i `.gitignore`.
+
+**Publicera till hemsidan** (separat repo i `~/rastegar.se`, GitHub Pages,
+deploy vid push till `main`):
+
+```bash
+python3 tools/bundle.py
+cp dist/dashh.html ~/rastegar.se/static/games/dashh.html
+cd ~/rastegar.se && python3 build.py && git add -A && git commit && git push
+```
+
+Spelkortet på sajten är `content/games/dashh.json`, ramen kring spelet
+`static/games/dashh-frame.js`, omslaget `static/img/games/dashh.svg`.
+Fullscreen sköts av sajtens egen `static/js/fullscreen.js` — bygg ingen egen.
+
+---
+
+## Struktur
+
+| Fil | Ansvar |
+|---|---|
+| `index.html` | canvas, HUD-markup, touchkontroller, all CSS |
+| `src/math.js` | vektorer, 4x4-matriser, utjämning |
+| `src/noise.js` | brus, terränghöjd, `WORLD_ID`, stadens kvarter |
+| `src/meshes.js` | proceduella meshar |
+| `src/gl.js` | WebGL2-lager: program, instansbatchar, billboards |
+| `src/shaders.js` | all GLSL |
+| `src/terrain.js` | terrängmesh, färg, utplacering, kollisionsrutnät |
+| `src/renderer.js` | kamera, scenrendering, partiklar, dag/natt |
+| `src/audio.js` | alla ljud syntetiseras i WebAudio |
+| `src/input.js` | tangentbord, mus, pointer lock, touch |
+| `src/player.js` | rörelse, dash, kamerarigg, spelarmodell |
+| `src/enemies.js` | 8 fiendetyper med AI, dödsanimation, vågsystem |
+| `src/combat.js` | svärd, laser, eldboll, explosioner, drops |
+| `src/upgrades.js` | uppgraderingskorten |
+| `src/hud.js` | HUD, radar, skadesiffror, menyskärmar |
+| `src/game.js` | speltillstånd, hitstop, huvudloop |
+
+---
+
+## Sådant som är lätt att gå bakåt på
+
+- **Kameran.** Den är intrimmad mot ArcLight (johanslekstuga.com): figuren tar
+  ~15 % av bildhöjden, sitter ~60 % ner och något åt vänster. Vyn ska stå
+  **blickstilla** tills spelaren aktivt vrider den — en kamera som kryper av sig
+  själv var det som kändes obehagligt förut. Utan pointer lock sveper vyn först
+  när pekaren når yttersta skärmkanten.
+- **Siktet.** Korshåret sitter där muspekaren är, och skottet går exakt dit.
+  Strålen räknas ut från kamerans *faktiska* blickriktning, inte den ideala
+  vinkeln — annars blir siktet några grader fel.
+- **Hitstop.** Tunga träffar fryser världen 40–90 ms. Håll andelen frysta
+  bildrutor runt någon enstaka procent, annars känns det som hack.
+- **Porträttläge.** Smala skärmar vidgar synfältet (`renderer.js`), annars blir
+  vyn ett titthål. Vidgningen är klampad — utan klamp blir gubben för liten.
+- **Modulcache.** Webbläsaren cachar `src/*.js` hårt. Testar du en ändring och
+  inget händer: testa `dist/dashh.html?cb=nånting` i stället.
