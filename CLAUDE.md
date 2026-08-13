@@ -1,7 +1,7 @@
 # DASHH: Voidfall
 
 Ett 3D arena-survivalspel i tredjeperson som körs i webbläsaren. Ligger som beta
-på <https://rastegar.se/games/dashh/>.
+på <https://rastegar.se/games/dashh/>. Källkoden: <https://github.com/PajBram/dashh>.
 
 **Ägare:** Paj (pajam98@hotmail.com). **Inte utvecklare** — förklara tekniska val
 i klarspråk på svenska och säg tydligt till när Paj behöver göra något själv.
@@ -89,6 +89,19 @@ Fullscreen sköts av sajtens egen `static/js/fullscreen.js` — bygg ingen egen.
   vinkeln — annars blir siktet några grader fel.
 - **Hitstop.** Tunga träffar fryser världen 40–90 ms. Håll andelen frysta
   bildrutor runt någon enstaka procent, annars känns det som hack.
+- **Drönarnas omloppsbana.** De cirklar på 13 meters radie och 4,5 m höjd. Tar
+  man bort den radiella termen spiralar de in och hamnar **rakt ovanför**
+  spelaren, på 60–86° höjdvinkel — dit går det inte att sikta. Då dör de aldrig,
+  vågen rensas aldrig och spawningen upphör. Det var en riktig bugg 2026-08-13.
+- **Vågens skyddsnät.** Efter 12 s i `clearing` hetsas eftersläntrare att jaga
+  spelaren, efter 26 s startar nästa våg ändå. Ta inte bort det: utan det kan en
+  enda oåtkomlig fiende låsa hela rundan.
+- **Kamerans uppåtgräns** är 1,0 rad (~57°) just för att fiender kommer
+  ovanifrån i staden. Sänk den inte tillbaka.
+- **Vapnen låter olika.** Svärdet har låg duns + metallklang, lasern torrt
+  högpassat knäpp utan bas, och båda varierar några procent i tonhöjd. Slå inte
+  ihop dem till ett gemensamt träffljud igen — det var så det lät förut och det
+  var det som kändes fel.
 - **Porträttläge.** Smala skärmar vidgar synfältet (`renderer.js`), annars blir
   vyn ett titthål. Vidgningen är klampad — utan klamp blir gubben för liten.
 - **Modulcache.** Webbläsaren cachar `src/*.js` hårt. Testar du en ändring och
