@@ -58,6 +58,7 @@ export class Enemy {
     this.shieldFlash = 0;
     this.death = 0;          // > 0 medan kroppen faller ihop
     this.deathMax = 0.62;
+    this.enrage = false;     // sätts om vågen drar ut på tiden
   }
 
   damage(n, ctx, crit) {
@@ -191,10 +192,18 @@ export class Enemy {
           speed = this.speed * 0.9;
           wishX = -nx; wishZ = -nz;
           if (this.stateT <= 0) { this.state = 'circle'; this.stateT = rand(0.7, 1.5); }
+        } else if (this.enrage) {
+          // Har vågen dröjt går de rakt på i spelarens höjd i stället för att
+          // cirkla — annars kan de bli hängande utom räckhåll.
+          wishX = nx; wishZ = nz;
+          speed = this.speed * 1.1;
         } else {
+          // Cirkla på armlängds avstånd. Utan den radiella termen spiralar de
+          // in och hamnar rakt ovanför spelaren, dit kameran inte kan sikta.
           const side = Math.sin(this.phase * 2.3) < 0 ? -1 : 1;
-          wishX = -nz * side + nx * 0.35;
-          wishZ = nx * side + nz * 0.35;
+          const radial = clamp((dist - 13) * 0.14, -1, 1);
+          wishX = -nz * side + nx * radial;
+          wishZ = nx * side + nz * radial;
           speed = this.speed * 0.5;
           if (this.stateT <= 0 && dist < 30) {
             this.state = 'dive'; this.stateT = 0.8;
@@ -369,7 +378,8 @@ export class Enemy {
       if (this.def.ai === 'sniper' && this.perch) {
         wantY = this.perch.h + 1.0;
       } else {
-        const off = this.def.ai === 'drone' ? (this.state === 'dive' ? 0.5 : 6.5)
+        const off = this.def.ai === 'drone'
+          ? (this.state === 'dive' || this.enrage ? 0.5 : 4.5)
           : this.def.ai === 'hover' ? 2.6
           : this.boss ? 1.5 : 0.5;
         wantY = p.pos.y + off + Math.sin(this.phase * 1.7) * 0.9;
@@ -718,6 +728,8 @@ export class WaveManager {
     this.queue = [];
     this.spawnTimer = 0;
     this.spawnedThisWave = 0;
+    this.clearT = 0;
+    this.enraged = false;
   }
 
   compose(wave, worldId) {
@@ -776,13 +788,28 @@ export class WaveManager {
         this.spawnAtRing(type, ctx);
         this.spawnTimer = type === 'boss' ? 1.2 : rand(0.20, 0.55);
       }
-      if (!this.queue.length) this.state = 'clearing';
+      if (!this.queue.length) { this.state = 'clearing'; this.clearT = 0; this.enraged = false; }
       return;
     }
     if (this.state === 'clearing') {
       if (!ctx.enemies.some((e) => e.alive)) {
         this.state = 'idle';
         this.timer = 4.5;
+        ctx.onWaveClear(this.wave);
+        return;
+      }
+      // Skyddsnät: en ensam eftersläntrare får aldrig låsa spelet för gott.
+      // Först hetsas de kvarvarande att söka upp spelaren, sedan rullar
+      // vågorna vidare ändå.
+      this.clearT += dt;
+      if (this.clearT > 12 && !this.enraged) {
+        this.enraged = true;
+        for (const e of ctx.enemies) if (e.alive) e.enrage = true;
+        ctx.toast('Eftersläntrare jagar dig');
+      }
+      if (this.clearT > 26) {
+        this.state = 'idle';
+        this.timer = 2.5;
         ctx.onWaveClear(this.wave);
       }
     }

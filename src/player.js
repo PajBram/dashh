@@ -91,7 +91,8 @@ export class Player {
 
   look(dx, dy, sens) {
     this.camYaw -= dx * sens;
-    this.camPitch = clamp(this.camPitch - dy * sens, -1.15, 0.75);
+    // Uppåtgränsen är generös: i Neotropolis kommer fienderna ovanifrån.
+    this.camPitch = clamp(this.camPitch - dy * sens, -1.15, 1.0);
     if (this.camYaw > Math.PI) this.camYaw -= TAU;
     if (this.camYaw < -Math.PI) this.camYaw += TAU;
   }
@@ -119,7 +120,7 @@ export class Player {
     this.camYaw -= ramp(input.cursorNX) * 3.4 * dt;
     if (this.camYaw > Math.PI) this.camYaw -= TAU;
     if (this.camYaw < -Math.PI) this.camYaw += TAU;
-    this.camPitch = clamp(this.camPitch - ramp(input.cursorNY) * 1.7 * dt, -1.15, 0.75);
+    this.camPitch = clamp(this.camPitch - ramp(input.cursorNY) * 1.7 * dt, -1.15, 1.0);
   }
 
   /**
