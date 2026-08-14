@@ -61,7 +61,18 @@ export function cityBuildingOfCell(i, j) {
   if (dc > 96) h += (dc - 96) * 1.6;              // skyskrapemur stänger arenan
   const ox = (r3 - 0.5) * (CITY_CELL - 2 * hx - 5);
   const oz = (r2 - 0.5) * (CITY_CELL - 2 * hz - 5);
-  return { x: cx + ox, z: cz + oz, hx, hz, h, neon: (r * 7.31) % 1 };
+  // Höga hus smalnar av i avsatser. Avsatserna bor HÄR — utseendet
+  // (renderer), kollisionen (terrain) och markhöjden (nedan) läser samma
+  // lista, annars glider de isär och man går på luft vid en avsats.
+  const tiers = [];
+  if (h > 46) {
+    tiers.push({ f: 1, top: h * 0.52 }, { f: 0.78, top: h * 0.8 }, { f: 0.6, top: h });
+  } else if (h > 26) {
+    tiers.push({ f: 1, top: h * 0.62 }, { f: 0.76, top: h });
+  } else {
+    tiers.push({ f: 1, top: h });
+  }
+  return { x: cx + ox, z: cz + oz, hx, hz, h, neon: (r * 7.31) % 1, tiers };
 }
 
 /** Byggnaden vars kvarter täcker (x, z), eller null. */
@@ -87,7 +98,14 @@ export function cityBuildings() {
 export function terrainHeight(x, z) {
   if (WORLD_ID === 'city') {
     const b = cityBuildingAt(x, z);
-    if (b && Math.abs(x - b.x) < b.hx && Math.abs(z - b.z) < b.hz) return b.h;
+    if (b && Math.abs(x - b.x) < b.hx && Math.abs(z - b.z) < b.hz) {
+      // uppifrån och ner: högsta avsats vars fotavtryck täcker punkten
+      for (let i = b.tiers.length - 1; i >= 0; i--) {
+        const t = b.tiers[i];
+        if (Math.abs(x - b.x) < b.hx * t.f && Math.abs(z - b.z) < b.hz * t.f) return t.top;
+      }
+      return b.tiers[0].top;
+    }
     return 0;
   }
   return wildHeight(x, z);

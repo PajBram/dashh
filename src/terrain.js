@@ -232,7 +232,10 @@ export function cityProps() {
   const grid = new ColliderGrid(8);
   const buildings = cityBuildings();
   for (const b of buildings) {
-    grid.add({ rect: true, x: b.x, z: b.z, hx: b.hx, hz: b.hz, top: b.h });
+    // en kollisionsrektangel per avsats, så flygaren kan runda tornens smalare topp
+    for (const t of b.tiers) {
+      grid.add({ rect: true, x: b.x, z: b.z, hx: b.hx * t.f, hz: b.hz * t.f, top: t.top });
+    }
   }
 
   const lights = [];

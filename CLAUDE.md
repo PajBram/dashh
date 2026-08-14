@@ -137,6 +137,15 @@ Fullscreen sköts av sajtens egen `static/js/fullscreen.js` — bygg ingen egen.
   enda oåtkomlig fiende låsa hela rundan.
 - **Kamerans uppåtgräns** är 1,0 rad (~57°) just för att fiender kommer
   ovanifrån i staden. Sänk den inte tillbaka.
+- **Husens avsatser bor i `noise.js`** (`b.tiers`). Utseendet i `renderer.js`,
+  kollisionsrektanglarna i `terrain.js` och markhöjden i `terrainHeight` läser
+  alla samma lista. Ändrar man formen på ett ställe men inte de andra går man
+  på luft vid en avsats, eller studsar mot en osynlig vägg.
+- **Mått i push() är hela meter**, inte halva. En bil på 3 m försvinner sedd
+  från gatan trettio meter under — flygtaxibilarna är 5,4 m av det skälet.
+- **Neotropolis fönster är enskilda rutor, mest släckta.** Band runt hela
+  fasaden blir lysande lameller som ser ut som bokhyllor; det är mörkret
+  mellan rutorna som gör att de tända läser som ljus. Höj inte andelen tända.
 - **Sanerarens cirkling har en radiell term** (`(dist − ring) * 0.15`) av
   exakt samma skäl som drönarnas: utan den spiralar den in rakt över
   spelaren där siktet inte når. Uppmätt 23–27 m och ≤6° höjdvinkel — håll

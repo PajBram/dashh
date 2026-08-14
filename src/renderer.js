@@ -5,7 +5,7 @@ import { TERRAIN_VS, TERRAIN_FS, INST_VS, INST_FS, SHADOW_VS, SHADOW_FS,
          PART_VS, PART_FS, SKY_VS, SKY_FS, WATER_VS, WATER_FS } from './shaders.js';
 import { sphere, box, cone, cylinder, disc, octahedron, grid } from './meshes.js';
 import { buildTerrainMesh, buildCityGroundMesh, scatterProps, cityProps } from './terrain.js';
-import { WORLD_SIZE, WATER_LEVEL, setWorld } from './noise.js';
+import { WORLD_SIZE, WATER_LEVEL, CITY_CELL, setWorld } from './noise.js';
 
 // ------------------------------------------------------------- partikelsystem
 
@@ -185,29 +185,138 @@ export class Renderer {
     this.terrain = w.terrain;
     this.static = w.static;
     this.props = w.props;
+    this.taxis = w.taxis || null;
     this.worldId = id;
+  }
+
+  /**
+   * Flygande taxibilar längs stadens gatunät. De ritas i dyn-batcharna varje
+   * bildruta och lever bara som en formel: läge = start + fart * tid, lindat
+   * runt kartan. Ingen AI, inga kollisioner — de är stadens puls, inte trafik
+   * man krockar med, och de flyger på höjder där man ändå inte slåss.
+   */
+  drawTaxis(time) {
+    if (!this.taxis) return;
+    const B = this.dyn;
+    const S = WORLD_SIZE;
+    for (const t of this.taxis) {
+      // position längs färdriktningen, lindad till [-S/2, S/2)
+      let u = (t.phase + t.speed * time) % S;
+      if (u < 0) u += S;
+      u -= S / 2;
+      const x = t.axis === 'x' ? u : t.line;
+      const z = t.axis === 'x' ? t.line : u;
+      const y = t.h + Math.sin(time * 0.7 + t.phase) * 0.35;
+      const yaw = t.axis === 'x'
+        ? (t.speed > 0 ? Math.PI / 2 : -Math.PI / 2)
+        : (t.speed > 0 ? 0 : Math.PI);
+      const body = t.cab ? [1.0, 0.78, 0.12] : [0.14, 0.15, 0.22];
+      const fwd = t.speed > 0 ? 1 : -1;
+      const fx = t.axis === 'x' ? fwd : 0, fz = t.axis === 'x' ? 0 : fwd;
+
+      // Måtten är i meter, och en vanlig bil försvinner sedd från gatan
+      // trettio meter under. De här är luftbussar, inte personbilar.
+      B.box.push(x, y, z, 2.6, 1.0, 5.4, body, 0, yaw, 0, t.cab ? 0.35 : 0.1);
+      B.box.push(x, y + 0.8, z, 2.0, 0.7, 2.7, [0.06, 0.10, 0.16], 0, yaw, 0, 0.3);
+      // strålkastare framåt, röda lyktor bakåt
+      B.sphere.push(x + fx * 2.7, y, z + fz * 2.7, 0.45, 0.34, 0.45, [0.9, 0.95, 1.0], 0, 0, 0, 1.5);
+      B.sphere.push(x - fx * 2.7, y, z - fz * 2.7, 0.38, 0.28, 0.38, [1.0, 0.2, 0.15], 0, 0, 0, 1.2);
+      // svävfältet under — det som säger "den flyger" snarare än "den åker"
+      B.cyl.push(x, y - 0.75, z, 1.7, 0.1, 1.7,
+        t.cab ? [1.0, 0.6, 0.2] : [0.35, 0.7, 1.0], 0, 0, 0, 0.9);
+    }
   }
 
   buildCityWorld() {
     const gl = this.gl, m = this.mesh;
     const props = cityProps();
-    const bodies = new InstancedBatch(gl, m.box, 256);
-    const bands = new InstancedBatch(gl, m.box, 2048);
-    const poles = new InstancedBatch(gl, m.cyl, 512);
+    const bodies = new InstancedBatch(gl, m.box, 1024);
+    const bands = new InstancedBatch(gl, m.box, 24576);
+    const poles = new InstancedBatch(gl, m.cyl, 1024);
     const orbs = new InstancedBatch(gl, m.sphere, 512);
     const NEON = [[0.25, 0.9, 1.0], [1.0, 0.3, 0.7], [1.0, 0.7, 0.2], [0.5, 1.0, 0.5]];
+    // deterministiskt "slumptal" per hus och våning — samma stad varje laddning
+    const h01 = (a, c) => { const s = Math.sin(a * 127.1 + c * 311.7) * 43758.5453; return s - Math.floor(s); };
 
     for (const b of props.buildings) {
       const tone = 0.8 + b.neon * 0.5;
-      bodies.push(b.x, b.h / 2, b.z, b.hx * 2, b.h, b.hz * 2,
-        [0.055 * tone, 0.06 * tone, 0.088 * tone], 0, 0, 0, 0);
+      const bodyCol = [0.055 * tone, 0.06 * tone, 0.088 * tone];
       const neon = NEON[Math.floor(b.neon * NEON.length) % NEON.length];
-      // fönsterband runt fasaden + lysande takkant
-      for (let y = 2.4; y < b.h - 1.4; y += 3.4) {
-        bands.push(b.x, y, b.z, b.hx * 2 + 0.06, 0.3, b.hz * 2 + 0.06,
-          [neon[0] * 0.38, neon[1] * 0.38, neon[2] * 0.38], 0, 0, 0, 0.14);
+
+      // --- kropp i avsatser (samma tiers som kollision och markhöjd)
+      let base = 0;
+      for (const t of b.tiers) {
+        const hx = b.hx * t.f, hz = b.hz * t.f;
+        bodies.push(b.x, (base + t.top) / 2, b.z, hx * 2, t.top - base, hz * 2, bodyCol, 0, 0, 0, 0);
+        // varje avsats får en svagt lysande kant
+        bands.push(b.x, t.top - 0.08, b.z, hx * 2 + 0.14, 0.14, hz * 2 + 0.14, neon,
+          0, 0, 0, t.top === b.h ? 0.9 : 0.3);
+
+        // --- fönster, ett i taget i ett rutnät. Band runt hela fasaden blir
+        // lysande lameller; enskilda rutor med mörka mellanrum läser som hus.
+        // Bara de nedersta 70 metrarna får rutor — resten är fjärran mur.
+        const wTop = Math.min(t.top - 1.6, 70);
+        for (let y = base + 2.6; y < wTop; y += 3.2) {
+          for (const ax of [0, 1]) {
+            const halfW = (ax === 0 ? hx : hz);
+            const cols = Math.max(2, Math.round(halfW * 2 / 3.1));
+            const step = (halfW * 2) / cols;
+            for (let c = 0; c < cols; c++) {
+              const off = -halfW + step * (c + 0.5);
+              const r = h01(b.x + y * 7.3 + c * 2.1, b.z + ax * 13.7);
+              let col, glow;
+              // de flesta rutor är släckta — det är mörkret som gör de tända
+              // till ljus i stället för till en tänd fasad
+              if (r < 0.74) { col = [0.075, 0.085, 0.125]; glow = 0.02; }
+              else if (r < 0.96) { col = [0.46, 0.40, 0.27]; glow = 0.11; }   // varmt kontorsljus
+              else { col = neon; glow = 0.3; }                                // enstaka neonrum
+              const w = step * 0.5, hgt = 0.85;
+              if (ax === 0) bands.push(b.x + off, y, b.z, w, hgt, hz * 2 + 0.05, col, 0, 0, 0, glow);
+              else bands.push(b.x, y, b.z + off, hx * 2 + 0.05, hgt, w, col, 0, 0, 0, glow);
+            }
+          }
+        }
+        base = t.top;
       }
-      bands.push(b.x, b.h - 0.1, b.z, b.hx * 2 + 0.16, 0.16, b.hz * 2 + 0.16, neon, 0, 0, 0, 0.9);
+
+      // --- takbråte: fläktlådor och en vattentank gör taklinjen ojämn
+      const top = b.tiers[b.tiers.length - 1];
+      if (b.h < 70) {
+        const n = 1 + Math.floor(h01(b.x, b.z * 3.1) * 3);
+        for (let k = 0; k < n; k++) {
+          const rx = (h01(b.x + k * 17, b.z) - 0.5) * b.hx * top.f * 1.1;
+          const rz = (h01(b.x, b.z + k * 23) - 0.5) * b.hz * top.f * 1.1;
+          const s = 0.7 + h01(b.x * 2 + k, b.z) * 1.1;
+          bodies.push(b.x + rx, b.h + s * 0.4, b.z + rz, s, s * 0.8, s * 0.9,
+            [0.10, 0.11, 0.15], 0, h01(k, b.x) * 1.5, 0, 0);
+        }
+        if (h01(b.z, b.x) > 0.55) {
+          poles.push(b.x - b.hx * top.f * 0.4, b.h + 1.0, b.z + b.hz * top.f * 0.35,
+            0.8, 2.0, 0.8, [0.13, 0.14, 0.18], 0, 0, 0, 0);
+        }
+      }
+
+      // --- gatuplan: skyltfönster och en mörk portöppning
+      const dc = Math.hypot(b.x, b.z);
+      if (dc < 96) {
+        bands.push(b.x, 1.4, b.z, b.hx * 2 * 0.78, 1.1, b.hz * 2 + 0.09,
+          [0.75, 0.66, 0.45], 0, 0, 0, 0.22);
+        bands.push(b.x, 1.4, b.z, b.hx * 2 + 0.09, 1.1, b.hz * 2 * 0.78,
+          [0.75, 0.66, 0.45], 0, 0, 0, 0.22);
+        const side = h01(b.x * 3, b.z * 5) > 0.5 ? 1 : -1;
+        bands.push(b.x + side * b.hx * 0.5, 1.25, b.z, 1.4, 2.5, b.hz * 2 + 0.14,
+          [0.03, 0.03, 0.05], 0, 0, 0, 0);
+      }
+
+      // --- takskylt: en lysande neonpanel på högkant, som en logga
+      if (b.neon > 0.68 && b.h < 58) {
+        const w = Math.min(5.5, b.hx * top.f * 1.2);
+        const along = h01(b.x * 7, b.z * 11) > 0.5;
+        bodies.push(b.x, b.h + 1.9, b.z, along ? w : 0.3, 3.0, along ? 0.3 : w,
+          [0.08, 0.08, 0.12], 0, 0, 0, 0);
+        bands.push(b.x, b.h + 1.9, b.z, along ? w * 0.86 : 0.44, 2.3, along ? 0.44 : w * 0.86,
+          neon, 0, 0, 0, 1.25);
+      }
     }
     for (const a of props.antennas) {
       poles.push(a.x, a.y + a.h / 2, a.z, 0.14, a.h, 0.14, [0.2, 0.2, 0.26], 0, 0, 0, 0.1);
@@ -218,7 +327,34 @@ export class Renderer {
       orbs.push(l.x, 5.35, l.z, 0.45, 0.3, 0.45,
         l.warm ? [1.0, 0.8, 0.5] : [0.5, 0.9, 1.0], 0, 0, 0, 1.1);
     }
-    return { terrain: uploadMesh(gl, buildCityGroundMesh(60)), static: [bodies, bands, poles, orbs], props };
+
+    // --- flygande taxi-rutter: raka filer längs gatunätet på olika höjd.
+    // Position är en ren funktion av tiden, så trafiken behöver inget
+    // eget tillstånd och rullar även bakom menyn.
+    const taxis = [];
+    const N = Math.floor(WORLD_SIZE / CITY_CELL);
+    for (let i = 1; i < N; i++) {
+      const line = -WORLD_SIZE / 2 + i * CITY_CELL;
+      if (Math.abs(line) > 105) continue;
+      if (h01(i * 3.3, 8.8) < 0.15) continue;          // alla gator har inte trafik
+      const nCars = 7 + Math.floor(h01(i, 4.2) * 6);
+      for (let k = 0; k < nCars; k++) {
+        const dir = h01(i * 7, k * 13) > 0.5 ? 1 : -1;
+        taxis.push({
+          axis: i % 2 === 0 ? 'x' : 'z',
+          line: line + dir * 2.6,                       // högertrafik även i luften
+          h: 9 + h01(i * 11, k * 5) * 26,
+          speed: dir * (7 + h01(k * 9, i) * 6),
+          phase: h01(i * 29, k * 31) * WORLD_SIZE,
+          cab: h01(i + k, 17.5) > 0.25,                 // några är inte taxi utan mörka bilar
+        });
+      }
+    }
+
+    return {
+      terrain: uploadMesh(gl, buildCityGroundMesh(60)),
+      static: [bodies, bands, poles, orbs], props, taxis,
+    };
   }
 
   buildWildWorld() {
@@ -331,7 +467,8 @@ export class Renderer {
       .f('uCity', this.worldId === 'city' ? 1 : 0);
     this.terrain.draw();
 
-    // --- alla instansierade objekt
+    // --- alla instansierade objekt (trafiken fylls på strax innan de ritas)
+    this.drawTaxis(time);
     this.pInst.use();
     this.applyEnv(this.pInst, env, cam.pos);
     for (const b of this.static) b.draw();
