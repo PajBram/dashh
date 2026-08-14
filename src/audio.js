@@ -157,6 +157,19 @@ export class Sound {
     this.noise({ dur: 0.18, vol: 0.12, freq: 500, sweep: 120 });
   }
   pickup() { this.tone({ f: 880, f2: 1320, dur: 0.07, type: 'sine', vol: 0.06 }); }
+  /** Mynt: två klara toner ovanpå varandra — ska inte gå att blanda ihop med XP. */
+  coin() {
+    const v = this.v(0.03);
+    this.tone({ f: 1180 * v, dur: 0.05, type: 'square', vol: 0.045 });
+    this.tone({ f: 1770 * v, dur: 0.10, type: 'square', vol: 0.030, delay: 0.035 });
+  }
+  /** Klirret när något köps i shoppen. */
+  buy() {
+    [660, 990, 1320].forEach((f, i) =>
+      this.tone({ f, dur: 0.16, type: 'triangle', vol: 0.09, delay: i * 0.05 }));
+  }
+  /** Nekat köp: kort, torr och otvetydig. */
+  denied() { this.tone({ f: 180, f2: 120, dur: 0.14, type: 'square', vol: 0.08 }); }
   heal() {
     this.tone({ f: 520, f2: 780, dur: 0.16, type: 'sine', vol: 0.10 });
     this.tone({ f: 780, f2: 1170, dur: 0.18, type: 'sine', vol: 0.07, delay: 0.06 });

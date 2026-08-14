@@ -16,7 +16,7 @@ OUT = ROOT / "dist" / "dashh.html"
 # Beroendeordning (löv först).
 ORDER = [
     "math.js", "noise.js", "meshes.js", "gl.js", "shaders.js", "terrain.js",
-    "renderer.js", "audio.js", "input.js", "upgrades.js", "player.js",
+    "renderer.js", "audio.js", "input.js", "upgrades.js", "shop.js", "player.js",
     "enemies.js", "missions.js", "adventure.js", "combat.js", "hud.js", "game.js", "main.js",
 ]
 

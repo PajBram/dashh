@@ -30,7 +30,8 @@
   .stat .label{display:block;font-size:9px;letter-spacing:.18em;opacity:.6}
   .stat span:last-child{font-size:17px;font-weight:700;font-variant-numeric:tabular-nums}
   #waveNum{color:var(--neon)} #levelNum{color:var(--neon2)}
-  #killNum{color:var(--hot)} #fpsNum{color:var(--good)}
+  #killNum{color:var(--hot)} #fpsNum{color:var(--good)} #goldNum{color:var(--gold)}
+  .stat.hidden{display:none}
 
   #bottom{position:absolute;left:50%;bottom:22px;transform:translateX(-50%);width:min(560px,72vw)}
   .bar{position:relative;height:20px;border-radius:10px;overflow:hidden;
@@ -155,6 +156,8 @@
     #fireRow{width:120px;height:13px;margin-left:0}
     #banner{font-size:30px;top:34%}
     #toasts{bottom:auto;top:210px;left:14px}
+    .wares{gap:8px} .ware{width:min(150px,42vw);padding:10px 8px 9px}
+    .ware .icon{font-size:22px} .ware .desc{font-size:10px;min-height:28px}
     .cards{gap:10px} .card{width:min(260px,80vw);padding:14px 12px}
     .card .icon{font-size:30px;margin-bottom:6px}
     .keys{gap:6px} .key{padding:7px 10px;font-size:11px}
@@ -249,6 +252,32 @@
   .card .num{position:absolute;top:8px;left:10px;font-size:10px;opacity:.4;letter-spacing:.1em}
   .card .lv{position:absolute;top:8px;right:10px;font-size:10px;color:var(--gold);letter-spacing:.1em}
 
+  /* shop */
+  .screen.shop{max-width:940px}
+  .purse{display:inline-block;margin:-14px 0 20px;padding:7px 20px;border-radius:999px;
+    background:rgba(255,204,77,.10);border:1px solid rgba(255,204,77,.35);
+    font-size:12px;letter-spacing:.22em}
+  .purse b{font-size:17px;color:var(--gold);margin-left:8px;font-variant-numeric:tabular-nums}
+  .wares{display:flex;flex-wrap:wrap;gap:12px;justify-content:center;margin-bottom:26px}
+  .ware{pointer-events:auto;cursor:pointer;width:186px;padding:14px 12px 12px;border-radius:12px;
+    background:linear-gradient(180deg,rgba(20,26,44,.95),rgba(10,13,24,.95));
+    border:1px solid var(--line);text-align:center;position:relative;
+    transition:transform .12s,border-color .12s,box-shadow .12s}
+  .ware:hover{transform:translateY(-4px);border-color:var(--gold);
+    box-shadow:0 12px 34px rgba(255,204,77,.25)}
+  .ware .icon{font-size:28px;line-height:1;margin-bottom:6px}
+  .ware .name{font-size:13px;font-weight:800;letter-spacing:.08em;color:var(--gold);margin-bottom:5px}
+  .ware .desc{font-size:11px;line-height:1.45;opacity:.75;min-height:32px}
+  .ware .price{margin-top:9px;font-size:13px;font-weight:800;letter-spacing:.1em;
+    border-top:1px solid rgba(255,255,255,.12);padding-top:7px}
+  .ware .price i{color:var(--gold);font-style:normal;font-size:11px;margin-left:2px}
+  .ware .own{position:absolute;top:8px;right:10px;font-size:10px;letter-spacing:.1em;opacity:.6}
+  /* har man inte råd syns varan ändå — man ska se vad man sparar till */
+  .ware.poor{opacity:.42;cursor:not-allowed}
+  .ware.poor:hover{transform:none;border-color:var(--line);box-shadow:none}
+  .ware.sold{opacity:.3;cursor:default}
+  .ware.sold:hover{transform:none;border-color:var(--line);box-shadow:none}
+
   /* game over */
   .goTitle{font-size:clamp(44px,9vw,86px);font-weight:900;letter-spacing:.12em;color:var(--hot);
     text-shadow:0 0 40px rgba(255,61,127,.6)}
@@ -266,6 +295,7 @@
   <div class="topbar">
     <div class="stat"><span class="label" id="waveLbl">VÅG</span><span id="waveNum">1</span></div>
     <div class="stat"><span class="label" id="levelLbl">NIVÅ</span><span id="levelNum">1</span></div>
+    <div class="stat hidden" id="goldStat"><span class="label">GULD</span><span id="goldNum">0</span></div>
     <div class="stat"><span class="label">KILLS</span><span id="killNum">0</span></div>
     <div class="stat"><span class="label">TID</span><span id="timeNum">0:00</span></div>
     <div class="stat"><span class="label">FPS</span><span id="fpsNum">—</span></div>

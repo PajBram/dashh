@@ -9,6 +9,7 @@ import { Enemy, WaveManager } from './enemies.js';
 import { AdventureManager } from './adventure.js';
 import { Combat } from './combat.js';
 import { rollChoices } from './upgrades.js';
+import { WARES, REPAIR, priceOf, repairPrice } from './shop.js';
 import { terrainHeight, WATER_LEVEL } from './noise.js';
 
 const DAY_LENGTH = 320;   // sekunder per dygn
@@ -75,6 +76,9 @@ export class Game {
     this.adventure.reset();
     this.particles.list.length = 0;
     this.upgradeLevels = new Map();
+    this.shopLevels = new Map();
+    this.gold = 0;
+    this.goldEarned = 0;
     this.level = 1;
     this.xp = 0;
     this.xpNeeded = 12;
@@ -240,6 +244,34 @@ export class Game {
     if (this.pendingLevelUps > 0 && this.state === 'playing') this.openLevelUp();
   }
 
+  addGold(n) {
+    this.gold += n;
+    this.goldEarned += n;
+  }
+
+  /** Ett köp i shoppen. Priset stiger för varje exemplar man redan har. */
+  buy(id) {
+    const p = this.player;
+    if (id === REPAIR.id) {
+      const cost = repairPrice(p);
+      if (!cost || cost > this.gold) { this.sound.denied(); return false; }
+      this.gold -= cost;
+      p.heal(p.stats.maxHp);
+      this.sound.buy();
+      return true;
+    }
+    const w = WARES.find((q) => q.id === id);
+    if (!w) return false;
+    const owned = this.shopLevels.get(id) || 0;
+    const cost = priceOf(w, owned);
+    if (owned >= w.max || cost > this.gold) { this.sound.denied(); return false; }
+    this.gold -= cost;
+    w.apply(p.stats, p);
+    this.shopLevels.set(id, owned + 1);
+    this.sound.buy();
+    return true;
+  }
+
   openLevelUp() {
     this.state = 'levelup';
     this.input.enabled = false;
@@ -285,10 +317,13 @@ export class Game {
   }
 
   onLevelClear(level) {
-    this.hud.showBanner('NIVÅ KLARAD', '', 2.2);
+    const reward = 60 + level * 25;
+    this.addGold(reward);
+    this.levelReward = reward;
+    this.hud.showBanner('NIVÅ KLARAD', `+${reward} guld`, 2.4);
     this.sound.levelUp();
     this.player.heal(this.player.stats.maxHp * 0.15);
-    this.interludeT = 2.0;      // en andhämtning innan mellanskärmen
+    this.interludeT = 2.0;      // en andhämtning innan shoppen
   }
 
   /** Uppdraget gick om intet — nivån görs om från början. */
@@ -314,7 +349,14 @@ export class Game {
     this.state = 'interlude';
     this.input.enabled = false;
     this.input.releaseLock();
-    this.hud.showInterlude(this, () => this.continueRun());
+    this.showShop();
+  }
+
+  /** Shoppen ritas om efter varje köp, så guld och priser alltid stämmer. */
+  showShop() {
+    this.hud.showShop(this, (id) => {
+      if (this.buy(id)) this.showShop();
+    }, () => this.continueRun());
   }
 
   /** Vidare från mellanskärmen till nästa nivå. */

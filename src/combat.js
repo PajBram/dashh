@@ -294,6 +294,16 @@ export class Combat {
         life: 26, phase: rand(TAU), col: [0.4, 1.0, 0.75],
       });
     }
+    // Guld faller bara i äventyret — det är där det finns något att handla för.
+    if (ctx.mode === 'adventure') {
+      const a = rand(TAU);
+      this.pickups.push({
+        kind: 'gold', value: Math.max(1, Math.round(e.xp * 1.6 * (1 + ctx.adventure.level * 0.06))),
+        x: e.pos.x, y: e.pos.y + e.height * 0.5, z: e.pos.z,
+        vx: Math.cos(a) * rand(2, 5), vy: rand(4, 7), vz: Math.sin(a) * rand(2, 5),
+        life: 30, phase: rand(TAU), col: [1.0, 0.82, 0.25],
+      });
+    }
     if (e.boss || Math.random() < 0.07) {
       this.pickups.push({
         kind: 'hp', value: e.boss ? 60 : 25,
@@ -409,6 +419,7 @@ export class Combat {
 
       if (d < 1.5) {
         if (q.kind === 'xp') { ctx.addXP(q.value); ctx.sound.pickup(); }
+        else if (q.kind === 'gold') { ctx.addGold(q.value); ctx.sound.coin(); }
         else { p.heal(q.value); ctx.sound.heal(); ctx.toast(`+${q.value} HP`); }
         ctx.particles.burst(q.x, q.y, q.z, 6,
           { speed: 3, life: 0.3, size: 0.35, col: q.col, alpha: 0.9, drag: 0.7 });
@@ -453,7 +464,7 @@ export class Combat {
       B.sphere.push(b.x, b.y, b.z, 0.75, 0.75, 0.75, b.col, 0, 0, 0, 1.2);
     }
     for (const q of this.pickups) {
-      const s = q.kind === 'xp' ? 0.55 : 0.9;
+      const s = q.kind === 'xp' ? 0.55 : q.kind === 'gold' ? 0.5 : 0.9;
       const lift = Math.sin(q.phase) * 0.12;
       B.octa.push(q.x, q.y + lift, q.z, s, s * 1.5, s, q.col, 0, q.phase, 0, 1.1);
       rend.particles.spawn({

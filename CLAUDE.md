@@ -31,7 +31,13 @@ egen CLAUDE.md. **Översätt inte spelet.**
    arenan, `WaveManager`) eller `adventure` (nivåer med utplacerade läger,
    `AdventureManager`). Båda använder samma monster, vapen och uppgraderingar —
    det som skiljer dem är var monstren finns och vad som avslutar en omgång.
-   Äventyret byggs ut stegvis: uppdrag, shop, rustning och egna bossar återstår.
+   Äventyret byggs ut stegvis: uppdrag och shop är på plats, rustning,
+   checkpoints och egna bossar återstår.
+
+   **Två sorters progression i äventyret, med flit:** slumpade
+   uppgraderingskort vid nivå-upp (`upgrades.js`) *och* varor man själv
+   väljer för guld i shoppen mellan nivåerna (`shop.js`). Blanda inte ihop
+   dem — poängen är att den ena är tur och den andra är ett beslut.
 
 ---
 
@@ -78,7 +84,8 @@ Fullscreen sköts av sajtens egen `static/js/fullscreen.js` — bygg ingen egen.
 | `src/missions.js` | äventyrets fyra uppdragstyper + bossuppdraget |
 | `src/adventure.js` | äventyrsläget: nivåer, läger, uppdragsval, skyddsnät |
 | `src/combat.js` | svärd, laser, eldboll, explosioner, drops |
-| `src/upgrades.js` | uppgraderingskorten |
+| `src/upgrades.js` | uppgraderingskorten (slumpade vid nivå-upp) |
+| `src/shop.js` | butiksvarorna man köper för guld mellan nivåerna |
 | `src/hud.js` | HUD, radar, skadesiffror, menyskärmar |
 | `src/game.js` | speltillstånd, hitstop, huvudloop |
 

@@ -1,6 +1,7 @@
 // All DOM-baserad UI: HUD-siffror, banderoller, radar, menyer.
 import { clamp } from './math.js';
 import { ARENA_RADIUS } from './noise.js';
+import { WARES, REPAIR, priceOf, repairPrice } from './shop.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -52,6 +53,7 @@ export class HUD {
     const adv = mode === 'adventure';
     $('waveLbl').textContent = adv ? 'NIVÅ' : 'VÅG';
     $('levelLbl').textContent = adv ? 'RANG' : 'NIVÅ';
+    $('goldStat').classList.toggle('hidden', !adv);   // guld finns bara i äventyret
   }
 
   // ------------------------------------------------------- skadesiffror
@@ -243,6 +245,7 @@ export class HUD {
       ? (g.adventure.level || '—')
       : (g.waves.wave || '—');
     $('levelNum').textContent = g.level;
+    if (g.mode === 'adventure') $('goldNum').textContent = g.gold;
     $('killNum').textContent = g.kills;
     const t = Math.floor(g.elapsed);
     $('timeNum').textContent = `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`;
@@ -459,24 +462,49 @@ export class HUD {
     $('btnRetry').addEventListener('click', onRetry);
   }
 
-  /** Mellan två nivåer. Här kommer shoppen att ligga. */
-  showInterlude(g, onContinue) {
-    const t = Math.floor(g.elapsed);
+  /**
+   * Shoppen mellan två nivåer. Varorna man inte har råd med syns ändå —
+   * man ska kunna se vad man sparar till.
+   */
+  showShop(g, onBuy, onContinue) {
     const next = g.adventure.level + 1;
     const boss = g.adventure.isBossLevel(next);
+    const p = g.player;
+
+    const rep = repairPrice(p);
+    const cards = WARES.map((w) => {
+      const owned = g.shopLevels.get(w.id) || 0;
+      const sold = owned >= w.max;
+      const cost = priceOf(w, owned);
+      const afford = !sold && cost <= g.gold;
+      return `
+        <div class="ware ${sold ? 'sold' : afford ? '' : 'poor'}" data-id="${w.id}">
+          <div class="icon">${w.icon}</div>
+          <div class="name">${w.name}</div>
+          <div class="desc">${w.desc}</div>
+          ${owned ? `<div class="own">×${owned}</div>` : ''}
+          <div class="price">${sold ? 'SLUT' : `${cost} <i>⬤</i>`}</div>
+        </div>`;
+    }).join('') + `
+        <div class="ware ${rep && rep <= g.gold ? '' : 'poor'}" data-id="${REPAIR.id}">
+          <div class="icon">${REPAIR.icon}</div>
+          <div class="name">${REPAIR.name}</div>
+          <div class="desc">${REPAIR.desc}</div>
+          <div class="price">${rep ? `${rep} <i>⬤</i>` : 'HELT'}</div>
+        </div>`;
+
     this.showOverlay(`
-      <div class="screen">
-        <div class="lvlTitle">NIVÅ ${g.adventure.level} KLARAD</div>
-        <div class="lvlSub">${boss ? 'NÄSTA: BOSS' : `NÄSTA: NIVÅ ${next}`}</div>
-        <div class="hint" style="margin:-16px 0 18px">${g.adventure.mission ? g.adventure.mission.title : ''}</div>
-        <div class="results">
-          <div class="result"><div class="rl">KILLS</div><div class="rv">${g.kills}</div></div>
-          <div class="result"><div class="rl">RANG</div><div class="rv">${g.level}</div></div>
-          <div class="result"><div class="rl">TID</div><div class="rv">${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}</div></div>
-        </div>
-        <button class="cta" id="btnNext">${boss ? 'MÖT BOSSEN' : 'VIDARE'}</button>
-        <div class="hint">här kommer shoppen att ligga — ännu inte byggd</div>
+      <div class="screen shop">
+        <div class="lvlTitle">NIVÅ ${g.adventure.level} KLARAD${g.levelReward ? ` · +${g.levelReward} GULD` : ''}</div>
+        <div class="lvlSub">SHOP</div>
+        <div class="purse">GULD <b>${g.gold}</b></div>
+        <div class="wares">${cards}</div>
+        <button class="cta" id="btnNext">${boss ? `VIDARE — NIVÅ ${next}: BOSS` : `VIDARE — NIVÅ ${next}`}</button>
+        <div class="hint">klicka för att köpa · priset stiger för varje exemplar</div>
       </div>`);
+    this.overlay.querySelectorAll('.ware').forEach((el) => {
+      el.addEventListener('click', () => onBuy(el.dataset.id));
+    });
     $('btnNext').addEventListener('click', onContinue);
   }
 
@@ -526,6 +554,7 @@ export class HUD {
             <div class="rv">${adv ? g.adventure.level : g.waves.wave}</div></div>
           <div class="result"><div class="rl">${adv ? 'RANG' : 'NIVÅ'}</div><div class="rv">${g.level}</div></div>
           <div class="result"><div class="rl">KILLS</div><div class="rv">${g.kills}</div></div>
+          ${adv ? `<div class="result"><div class="rl">GULD</div><div class="rv">${g.goldEarned}</div></div>` : ''}
           <div class="result"><div class="rl">TID</div><div class="rv">${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}</div></div>
           <div class="result"><div class="rl">SKADA</div><div class="rv">${Math.round(g.damageDealt)}</div></div>
         </div>
