@@ -39,8 +39,13 @@ export class Enemy {
     this.hp = this.maxHp;
     this.dmg = t.dmg * (1 + (wave - 1) * 0.07);
     this.speed = t.speed * (1 + Math.min(0.35, (wave - 1) * 0.018));
-    this.radius = t.radius;
-    this.height = t.height;
+    // Neotropolis maskiner är byggda större än Vildheims djur. Skalan sitter
+    // här så att träffytan, höjden och modellen växer i takt — skalar man
+    // bara ritningen träffar man luft, och skalar man bara radien blir det
+    // osynliga väggar. Bossarna har redan sin storlek och lämnas ifred.
+    this.scale = this.fly && !this.boss ? 1.35 : 1;
+    this.radius = t.radius * this.scale;
+    this.height = t.height * this.scale;
     this.xp = t.xp;
     this.col = ((this.fly && CITY_COLS[type]) || t.col).slice();
     this.pos = { x, y: terrainHeight(x, z), z };
@@ -615,9 +620,11 @@ export class Enemy {
     const csY = Math.cos(yaw), snY = Math.sin(yaw);
 
     // Under döden faller hela kroppen framåt, sjunker ner och krymper bort.
+    // Kroppsskalan rider med här: både P() och put() går genom shrink, så
+    // hela modellen växer utan att en enda mätsiffra i ritningen ändras.
     const dying = this.death > 0;
     const dT = dying ? 1 - this.death / this.deathMax : 0;
-    const shrink = 1 - dT * dT * 0.75;
+    const shrink = (1 - dT * dT * 0.75) * this.scale;
     const fall = dT * 1.5;
     const cf = Math.cos(fall), sf = Math.sin(fall);
 

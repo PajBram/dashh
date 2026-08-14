@@ -141,6 +141,10 @@ Fullscreen sköts av sajtens egen `static/js/fullscreen.js` — bygg ingen egen.
   kollisionsrektanglarna i `terrain.js` och markhöjden i `terrainHeight` läser
   alla samma lista. Ändrar man formen på ett ställe men inte de andra går man
   på luft vid en avsats, eller studsar mot en osynlig vägg.
+- **Monsterstorlek sitter i `Enemy.scale`**, som både `radius`/`height` och
+  ritningens `shrink` läser. Skalar man bara modellen skjuter man på luft;
+  skalar man bara radien uppstår osynliga väggar. Neotropolis maskiner går på
+  1,35 — Vildheims djur och alla bossar på 1.
 - **Mått i push() är hela meter**, inte halva. En bil på 3 m försvinner sedd
   från gatan trettio meter under — flygtaxibilarna är 5,4 m av det skälet.
 - **Neotropolis fönster är enskilda rutor, mest släckta.** Band runt hela
