@@ -43,6 +43,11 @@
   #xpFill{background:linear-gradient(90deg,var(--neon),var(--neon2))}
   #hpText{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
     font-size:11px;font-weight:700;letter-spacing:.08em;text-shadow:0 1px 3px #000}
+  /* rustningsnivån sitter i hälsobalken, till höger om siffrorna */
+  #armTag{position:absolute;right:8px;top:0;bottom:0;display:flex;align-items:center;
+    font-size:11px;font-weight:700;letter-spacing:.06em;color:#cfe0ff;
+    text-shadow:0 1px 3px #000}
+  #armTag.hidden{display:none}
   #dashRow{display:flex;gap:6px;justify-content:center;margin-top:2px}
   .pip{width:44px;height:6px;border-radius:3px;background:rgba(255,255,255,.13);
     border:1px solid rgba(77,243,255,.25)}
@@ -202,6 +207,14 @@
   .cta.alt:hover{box-shadow:0 0 60px rgba(255,61,127,.6)}
   .hint{margin-top:16px;font-size:11px;letter-spacing:.2em;opacity:.45}
 
+  /* fortsätt-rutan när det finns en checkpoint */
+  .resume{margin:0 0 24px;padding:18px 20px 14px;border-radius:14px;
+    background:linear-gradient(165deg,rgba(58,44,12,.85),rgba(18,12,5,.9));
+    border:1px solid rgba(255,204,77,.35);display:inline-block}
+  .resume .cta{background:linear-gradient(180deg,#ffe08a,var(--gold));color:#1a1204;
+    box-shadow:0 0 40px rgba(255,204,77,.45)}
+  .resume .hint{margin-top:10px}
+
   /* världsval */
   .worlds{display:flex;gap:18px;justify-content:center;flex-wrap:wrap;margin:6px 0 22px}
   .world{pointer-events:auto;cursor:pointer;width:min(300px,42vw);padding:22px 18px 16px;
@@ -319,7 +332,8 @@
   <canvas id="minimap" width="320" height="320"></canvas>
 
   <div id="bottom">
-    <div class="bar"><div id="hpFill"></div><span id="hpText">100 / 100</span></div>
+    <div class="bar"><div id="hpFill"></div><span id="hpText">100 / 100</span>
+      <span id="armTag" class="hidden">🪖 0</span></div>
     <div class="bar xp"><div id="xpFill"></div></div>
     <div id="dashRow"></div>
     <div id="fireRow" class="hidden"><div id="fireFill"></div><span>C · ELDBOLL</span></div>

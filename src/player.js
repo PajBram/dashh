@@ -46,6 +46,7 @@ export class Player {
     this.pos = { x: 0, y: terrainHeight(0, 0) + 2, z: 0 };
     this.vel = { x: 0, y: 0, z: 0 };
     this.hp = this.stats.maxHp;
+    this.armor = 0;          // rustningsnivå, byggs upp av fynd i äventyret
     this.yaw = 0;
     this.camYaw = 0;
     this.camPitch = -0.24;
@@ -157,6 +158,9 @@ export class Player {
 
   takeDamage(n) {
     if (this.invuln > 0 || !this.alive) return false;
+    // Rustningen dämpar med avtagande effekt: varje nivå hjälper, men
+    // kurvan når aldrig noll skada hur många delar man än hittar.
+    if (this.armor > 0) n /= 1 + this.armor * 0.06;
     this.hp -= n;
     this.invuln = 0.55;
     this.hitFlash = 1;
@@ -520,6 +524,46 @@ export class Player {
     for (const s of [-1, 1]) {
       put(B.sphere, P(0.55 * s, 2.02 + bob, 0), 0.44, 0.30, 0.44, plate, 0, 0, -0.15 * s, inv);
       put(B.box, P(0.55 * s, 2.13 + bob, 0), 0.3, 0.05, 0.3, gold, 0, 0, -0.15 * s, 0.3);
+    }
+
+    // ---- rustningssetet: syns direkt, och byter skepnad vart femte steg
+    const arm = this.armor | 0;
+    if (arm > 0) {
+      const tier = Math.min(4, Math.floor(arm / 5));
+      const raw = city ? [0.60, 0.66, 0.80] : [0.66, 0.60, 0.46];
+      // ju tyngre rustning, desto blankare metall
+      const shine = Math.min(0.35, arm * 0.02);
+      const metal = F([raw[0] + shine, raw[1] + shine, raw[2] + shine]);
+      const edge = city ? trim : gold;
+
+      // förstärkta axelplåtar redan från första delen
+      for (const s of [-1, 1]) {
+        put(B.box, P(0.6 * s, 2.15 + bob, 0), 0.36, 0.11, 0.4, metal, 0, 0, -0.15 * s, 0.1);
+      }
+      if (tier >= 1) {
+        // bröstharnesk med kant
+        put(B.box, P(0, 1.8 + bob, 0.2 + lean * 0.18), 0.66, 0.5, 0.3, metal, lean, 0, 0, 0.08);
+        put(B.box, P(0, 1.56 + bob, 0.3 + lean * 0.18), 0.5, 0.07, 0.1, edge, lean, 0, 0, 0.35);
+      }
+      if (tier >= 2) {
+        // lårsköldar
+        for (const s of [-1, 1]) {
+          put(B.box, P(0.3 * s, 1.0 + bob, 0.12), 0.26, 0.42, 0.2, metal, 0.1, 0, 0.1 * s, 0.08);
+        }
+      }
+      if (tier >= 3) {
+        // ryggplåt och krage
+        put(B.box, P(0, 1.9 + bob, -0.34), 0.62, 0.6, 0.14, metal, 0, 0, 0, 0.08);
+        put(B.cyl, P(0, 2.1 + bob, 0), 0.3, 0.1, 0.3, metal, 0, 0, 0, 0.2);
+      }
+      if (tier >= 4) {
+        // svävande plattor som kretsar kring bäraren
+        for (let i = 0; i < 3; i++) {
+          const a = time * 0.9 + i * (Math.PI * 2 / 3);
+          put(B.box, [x + Math.cos(a) * 1.15, y + 1.7 + bob + Math.sin(time * 1.6 + i) * 0.12,
+            z + Math.sin(a) * 1.15], 0.08, 0.3, 0.18, edge, 0, a, 0, 0.5);
+        }
+      }
     }
 
     // ---- hals + huvud

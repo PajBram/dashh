@@ -36,6 +36,12 @@ export const WARES = [
   { id: 'xp', icon: '🧠', name: 'SYNAPSLÄNK', desc: '+20% erfarenhet',
     base: 45, grow: 1.4, max: 6,
     apply: (st) => { st.xpMult *= 1.2; } },
+
+  // Rustning hittar man i första hand ute på kartan; det här är för den som
+  // hellre betalar än letar. Dyrt med flit, och utan tak precis som fynden.
+  { id: 'armor', icon: '🪖', name: 'RUSTNINGSDEL', desc: '+1 rustningsnivå',
+    base: 90, grow: 1.4, max: 99,
+    apply: (st, p) => { p.armor += 1; } },
 ];
 
 /** Fältverkstaden är ingen uppgradering utan en tjänst: den fyller hälsan. */

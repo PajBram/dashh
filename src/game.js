@@ -6,7 +6,7 @@ import { Sound } from './audio.js';
 import { HUD } from './hud.js';
 import { Player } from './player.js';
 import { Enemy, WaveManager } from './enemies.js';
-import { AdventureManager } from './adventure.js';
+import { AdventureManager, CHECKPOINT_EVERY } from './adventure.js';
 import { Combat } from './combat.js';
 import { rollChoices } from './upgrades.js';
 import { WARES, REPAIR, priceOf, repairPrice } from './shop.js';
@@ -33,6 +33,7 @@ export class Game {
     this.mode = 'survival';   // 'survival' = vågor, 'adventure' = nivåer
     this.usedLock = false;
     this.best = this.loadBest();
+    this.checkpoint = this.loadCheckpoint();
     this.fps = 60;
     this.frameCount = 0;
     this.resetRun();
@@ -95,22 +96,29 @@ export class Game {
     this.hud.setBoss(null);
   }
 
-  start(worldId, mode) {
+  start(worldId, mode, checkpoint = null) {
     if (worldId) this.worldId = worldId;
     if (mode) this.mode = mode;
+    if (checkpoint) this.worldId = checkpoint.world;
     this.renderer.buildWorld(this.worldId);
     this.colliders = this.renderer.props.grid;
     this.buildings = this.renderer.props.buildings || null;   // taksnipern behöver dem
     this.sound.init();
     this.sound.resume();
     this.resetRun();
+    if (checkpoint) this.applyCheckpoint(checkpoint);
     this.state = 'playing';
     this.hud.hideOverlay();
     this.hud.setMode(this.mode);
     this.hud.showHUD(true);
     const adv = this.mode === 'adventure';
-    if (this.worldId === 'city') this.hud.showBanner('NEOTROPOLIS', adv ? 'ge dig ut i staden' : 'håll mellanslag — flyg', 3);
-    else this.hud.showBanner('VILDHEIM', adv ? 'ge dig ut på kartan' : 'vågorna kommer');
+    if (checkpoint) {
+      this.hud.showBanner(`NIVÅ ${checkpoint.level + 1}`, 'du fortsätter från checkpointen', 3);
+    } else if (this.worldId === 'city') {
+      this.hud.showBanner('NEOTROPOLIS', adv ? 'ge dig ut i staden' : 'håll mellanslag — flyg', 3);
+    } else {
+      this.hud.showBanner('VILDHEIM', adv ? 'ge dig ut på kartan' : 'vågorna kommer');
+    }
     this.input.enabled = true;
     if (!this.input.touch) this.input.requestLock();
   }
@@ -123,10 +131,12 @@ export class Game {
     this.hud.showModes((m) => this.chooseMode(m));
   }
 
-  /** Spelsättet är valt — nu väljer man värld. */
+  /** Spelsättet är valt — nu väljer man värld, eller fortsätter där man var. */
   chooseMode(mode) {
     this.mode = mode;
-    this.hud.showStart((w) => this.start(w, mode), this.input.touch, mode, () => this.showMenu());
+    const cp = mode === 'adventure' ? this.checkpoint : null;
+    this.hud.showStart((w) => this.start(w, mode), this.input.touch, mode,
+      () => this.showMenu(), cp, () => this.start(cp.world, mode, cp));
   }
 
   pause() {
@@ -157,9 +167,16 @@ export class Game {
     });
     this.saveBest();
     setTimeout(() => {
-      if (this.state === 'dead') {
-        this.hud.showGameOver(this, () => this.start(), () => this.showMenu());
-      }
+      if (this.state !== 'dead') return;
+      // I äventyret börjar man om från senast klarade checkpoint, med exakt
+      // den utrustning man hade där. Finns ingen checkpoint börjar man om.
+      // …men bara om checkpointen hör till just den här körningen. En gammal
+      // sparning från ett tidigare äventyr ska inte katapultera en framåt.
+      const c = this.checkpoint;
+      const cp = this.mode === 'adventure' && c && c.world === this.worldId
+        && c.level < this.adventure.level ? c : null;
+      this.hud.showGameOver(this, () => this.start(this.worldId, this.mode, cp),
+        () => this.showMenu(), cp);
     }, 900);
   }
 
@@ -247,6 +264,80 @@ export class Game {
   addGold(n) {
     this.gold += n;
     this.goldEarned += n;
+  }
+
+  addArmor(n) {
+    const p = this.player;
+    p.armor += n;
+    this.sound.tone({ f: 300, f2: 520, dur: 0.16, type: 'triangle', vol: 0.10 });
+    this.sound.tone({ f: 600, f2: 900, dur: 0.12, type: 'sine', vol: 0.06, delay: 0.05 });
+    this.toast(`🪖 Rustning ${p.armor}`);
+    this.particles.burst(p.pos.x, p.pos.y + 1.4, p.pos.z, 14, {
+      speed: 6, life: 0.5, size: 0.4, size2: 0.05,
+      col: [0.72, 0.82, 1.0], alpha: 0.9, drag: 0.6, grav: -3,
+    });
+  }
+
+  // ------------------------------------------------------------ checkpoints
+
+  /**
+   * Var tionde nivå sparas hela utrustningen — och den sparas när man
+   * lämnar shoppen, inte när nivån tog slut, så det man hann köpa följer med.
+   */
+  saveCheckpoint() {
+    const p = this.player;
+    this.checkpoint = {
+      world: this.worldId,
+      level: this.adventure.level,
+      stats: Object.assign({}, p.stats),
+      hp: p.hp,
+      armor: p.armor,
+      gold: this.gold,
+      goldEarned: this.goldEarned,
+      kills: this.kills,
+      damageDealt: this.damageDealt,
+      elapsed: this.elapsed,
+      xpLevel: this.level,
+      xp: this.xp,
+      xpNeeded: this.xpNeeded,
+      upgrades: [...this.upgradeLevels],
+      shop: [...this.shopLevels],
+    };
+    try { localStorage.setItem('dashh.checkpoint', JSON.stringify(this.checkpoint)); } catch (e) { /* ignoreras */ }
+    this.hud.showBanner('CHECKPOINT', `nivå ${this.adventure.level} sparad`, 2.6);
+    this.toast(`Checkpoint: nivå ${this.adventure.level}`);
+  }
+
+  loadCheckpoint() {
+    try {
+      const cp = JSON.parse(localStorage.getItem('dashh.checkpoint'));
+      return cp && cp.level ? cp : null;
+    } catch (e) { return null; }
+  }
+
+  clearCheckpoint() {
+    this.checkpoint = null;
+    try { localStorage.removeItem('dashh.checkpoint'); } catch (e) { /* ignoreras */ }
+  }
+
+  /** Plockar tillbaka spelaren till hur hen såg ut vid checkpointen. */
+  applyCheckpoint(cp) {
+    const p = this.player;
+    Object.assign(p.stats, cp.stats);
+    p.hp = Math.min(cp.hp, p.stats.maxHp);
+    p.armor = cp.armor || 0;
+    p.dashCharges = p.stats.dashMax;
+    this.gold = cp.gold;
+    this.goldEarned = cp.goldEarned || cp.gold;
+    this.kills = cp.kills || 0;
+    this.damageDealt = cp.damageDealt || 0;
+    this.elapsed = cp.elapsed || 0;
+    this.level = cp.xpLevel || 1;
+    this.xp = cp.xp || 0;
+    this.xpNeeded = cp.xpNeeded || 12;
+    this.upgradeLevels = new Map(cp.upgrades || []);
+    this.shopLevels = new Map(cp.shop || []);
+    this.adventure.level = cp.level;      // nästa nivå blir den efter checkpointen
   }
 
   /** Ett köp i shoppen. Priset stiger för varje exemplar man redan har. */
@@ -362,6 +453,10 @@ export class Game {
   /** Vidare från mellanskärmen till nästa nivå. */
   continueRun() {
     this.hud.hideOverlay();
+    // Checkpointen tas när man lämnar shoppen, så köpen räknas med.
+    if (this.adventure.state === 'cleared' && this.adventure.level % CHECKPOINT_EVERY === 0) {
+      this.saveCheckpoint();
+    }
     this.adventure.nextLevel();
     if (this.pendingLevelUps > 0) { this.openLevelUp(); return; }
     this.state = 'playing';

@@ -31,8 +31,8 @@ egen CLAUDE.md. **Översätt inte spelet.**
    arenan, `WaveManager`) eller `adventure` (nivåer med utplacerade läger,
    `AdventureManager`). Båda använder samma monster, vapen och uppgraderingar —
    det som skiljer dem är var monstren finns och vad som avslutar en omgång.
-   Äventyret byggs ut stegvis: uppdrag och shop är på plats, rustning,
-   checkpoints och egna bossar återstår.
+   Äventyret byggs ut stegvis: uppdrag, shop, rustning och checkpoints är på
+   plats, egna bossar återstår.
 
    **Två sorters progression i äventyret, med flit:** slumpade
    uppgraderingskort vid nivå-upp (`upgrades.js`) *och* varor man själv
@@ -113,6 +113,15 @@ Fullscreen sköts av sajtens egen `static/js/fullscreen.js` — bygg ingen egen.
   samma stund nivån börjar och rusar mot spelaren — och då är kartan inte en
   karta, bara en våg som råkade starta längre bort. Det hände i första försöket
   2026-08-14.
+- **Rustningen har inget tak, och ska inte få det.** Dämpningen är
+  `skada / (1 + rustning * 0.06)` — avtagande, så nivå 50 ger 75 % och nivå
+  100 ger 86 %, men aldrig odödlighet. Byt inte till procent per nivå: då blir
+  spelaren osårbar vid nivå 17 och resten av äventyret är meningslöst.
+- **Checkpointen tas när man lämnar shoppen**, inte när nivån är rensad —
+  annars förloras det man precis handlade för sitt surt förvärvade guld.
+  Den sparas i `localStorage` och överlever att fliken stängs. En checkpoint
+  från ett *tidigare* äventyr erbjuds bara i menyn, aldrig på dödsskärmen
+  (`cp.level < adventure.level`), annars katapulteras en ny körning framåt.
 - **Bundlern har en enda namnrymd.** `tools/bundle.py` klistrar ihop alla
   moduler i samma scope, så två filer som döper något på toppnivå till samma
   sak fungerar i `src/` men ger en **vit skärm** i `dist/`. Det hände med

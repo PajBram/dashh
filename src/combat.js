@@ -304,6 +304,15 @@ export class Combat {
         life: 30, phase: rand(TAU), col: [1.0, 0.82, 0.25],
       });
     }
+    // Rustningsdelar: säkra från bossar och eliter, annars ett fynd bland många.
+    if (ctx.mode === 'adventure' && (e.boss || e.elite || Math.random() < 0.06)) {
+      this.pickups.push({
+        kind: 'armor', value: e.boss ? 2 : 1,
+        x: e.pos.x, y: e.pos.y + e.height * 0.6, z: e.pos.z,
+        vx: rand(-2, 2), vy: rand(5, 8), vz: rand(-2, 2),
+        life: 40, phase: rand(TAU), col: [0.72, 0.80, 0.95],
+      });
+    }
     if (e.boss || Math.random() < 0.07) {
       this.pickups.push({
         kind: 'hp', value: e.boss ? 60 : 25,
@@ -420,6 +429,7 @@ export class Combat {
       if (d < 1.5) {
         if (q.kind === 'xp') { ctx.addXP(q.value); ctx.sound.pickup(); }
         else if (q.kind === 'gold') { ctx.addGold(q.value); ctx.sound.coin(); }
+        else if (q.kind === 'armor') { ctx.addArmor(q.value); }
         else { p.heal(q.value); ctx.sound.heal(); ctx.toast(`+${q.value} HP`); }
         ctx.particles.burst(q.x, q.y, q.z, 6,
           { speed: 3, life: 0.3, size: 0.35, col: q.col, alpha: 0.9, drag: 0.7 });
@@ -466,7 +476,12 @@ export class Combat {
     for (const q of this.pickups) {
       const s = q.kind === 'xp' ? 0.55 : q.kind === 'gold' ? 0.5 : 0.9;
       const lift = Math.sin(q.phase) * 0.12;
-      B.octa.push(q.x, q.y + lift, q.z, s, s * 1.5, s, q.col, 0, q.phase, 0, 1.1);
+      // rustningsdelen är en plåt, inte ett klot — den ska synas för vad den är
+      if (q.kind === 'armor') {
+        B.box.push(q.x, q.y + lift, q.z, 0.42, 0.5, 0.14, q.col, 0.2, q.phase * 0.6, 0, 0.9);
+      } else {
+        B.octa.push(q.x, q.y + lift, q.z, s, s * 1.5, s, q.col, 0, q.phase, 0, 1.1);
+      }
       rend.particles.spawn({
         x: q.x, y: q.y + lift, z: q.z, life: 0.2, size: s * 1.6, size2: 0,
         col: q.col, alpha: 0.35, drag: 0.1,

@@ -19,6 +19,7 @@ export class HUD {
     this.overlay = $('overlay');
     this.hpFill = $('hpFill');
     this.hpText = $('hpText');
+    this.armTag = $('armTag');
     this.xpFill = $('xpFill');
     this.dashRow = $('dashRow');
     this.banner = $('banner');
@@ -201,6 +202,13 @@ export class HUD {
     // bara ett sikte på skärmen: göm systempekaren under spelets gång
     const want = g.state === 'playing' && free ? 'none' : 'crosshair';
     if (this._cursor !== want) { this._cursor = want; g.canvas.style.cursor = want; }
+    const arm = p.armor | 0;
+    this.armTag.classList.toggle('hidden', arm <= 0);
+    if (arm > 0) {
+      const cut = Math.round((1 - 1 / (1 + arm * 0.06)) * 100);
+      this.armTag.textContent = `🪖 ${arm} · −${cut}%`;
+    }
+
     const hpFrac = clamp(p.hp / p.stats.maxHp, 0, 1);
     this.hpFill.style.transform = `scaleX(${hpFrac})`;
     this.hpText.textContent = `${Math.ceil(p.hp)} / ${Math.round(p.stats.maxHp)}`;
@@ -398,7 +406,7 @@ export class HUD {
     });
   }
 
-  showStart(onPick, touch, mode = 'survival', onBack = null) {
+  showStart(onPick, touch, mode = 'survival', onBack = null, checkpoint = null, onResume = null) {
     this._cursor = null;
     const keys = touch ? `
           <div class="key"><b>VÄNSTER HALVA</b> Spak — rör dig</div>
@@ -420,6 +428,13 @@ export class HUD {
         <div class="title">DASHH</div>
         <div class="subtitle">${adv ? 'ÄVENTYR' : 'ÖVERLEVNAD'}<span class="betaTag">${VERSION}</span></div>
         <div class="betaNote">tidig version — buggar och konstigheter förekommer, säg gärna till</div>
+        ${checkpoint ? `
+        <div class="resume">
+          <button class="cta" id="btnResume">FORTSÄTT — NIVÅ ${checkpoint.level + 1}</button>
+          <div class="hint">${checkpoint.world === 'city' ? 'Neotropolis' : 'Vildheim'} ·
+            checkpoint på nivå ${checkpoint.level} · ${checkpoint.gold} guld ·
+            rustning ${checkpoint.armor || 0}</div>
+        </div>` : ''}
         <div class="worlds">
           <div class="world wild" data-w="wild">
             <div class="wIcon">🌲</div>
@@ -437,13 +452,16 @@ export class HUD {
           </div>
         </div>
         <div class="keys">${keys}</div>
-        <div class="hint">välj din värld — ${adv ? 'du stannar i den hela äventyret' : 'överlev vågorna'}</div>
+        <div class="hint">${checkpoint
+          ? 'väljer du en värld börjar ett nytt äventyr — checkpointen ligger kvar tills du når en ny'
+          : `välj din värld — ${adv ? 'du stannar i den hela äventyret' : 'överlev vågorna'}`}</div>
         ${onBack ? '<div class="hint back" id="btnBack">← tillbaka till spelsätt</div>' : ''}
       </div>`);
     this.overlay.querySelectorAll('.world').forEach((el) => {
       el.addEventListener('click', () => onPick(el.dataset.w));
     });
     if (onBack) $('btnBack').addEventListener('click', onBack);
+    if (checkpoint && onResume) $('btnResume').addEventListener('click', onResume);
   }
 
   /** Uppdraget gick förlorat — samma nivå görs om. */
@@ -538,7 +556,7 @@ export class HUD {
     $('btnResume').addEventListener('click', onResume);
   }
 
-  showGameOver(g, onRestart, onMenu) {
+  showGameOver(g, onRestart, onMenu, checkpoint = null) {
     const t = Math.floor(g.elapsed);
     const adv = g.mode === 'adventure';
     const best = adv
@@ -558,9 +576,12 @@ export class HUD {
           <div class="result"><div class="rl">TID</div><div class="rv">${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}</div></div>
           <div class="result"><div class="rl">SKADA</div><div class="rv">${Math.round(g.damageDealt)}</div></div>
         </div>
-        <button class="cta" id="btnRestart">SPELA IGEN</button>
+        <button class="cta" id="btnRestart">${checkpoint
+          ? `FORTSÄTT — NIVÅ ${checkpoint.level + 1}` : 'SPELA IGEN'}</button>
         <button class="cta alt" id="btnMenu">TILL MENYN</button>
-        <div class="hint">${best}</div>
+        <div class="hint">${checkpoint
+          ? `du återvänder till checkpointen på nivå ${checkpoint.level}, med allt du hade där`
+          : best}</div>
       </div>`);
     $('btnRestart').addEventListener('click', onRestart);
     $('btnMenu').addEventListener('click', onMenu);
