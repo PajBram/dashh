@@ -59,6 +59,34 @@ export class Enemy {
     this.death = 0;          // > 0 medan kroppen faller ihop
     this.deathMax = 0.62;
     this.enrage = false;     // sätts om vågen drar ut på tiden
+    this.guard = false;      // äventyrsläget: står på post tills spelaren närmar sig
+    this.home = null;
+    this.aggroRange = 0;
+  }
+
+  /**
+   * Ställer monstret på post: det stannar kring platsen där det står och
+   * vaknar först när spelaren kommer inom `range`, eller när något skadar det.
+   */
+  postGuard(range = 28) {
+    this.guard = true;
+    this.home = { x: this.pos.x, z: this.pos.z };
+    this.aggroRange = range;
+    this.patrolR = rand(1.5, 4.5);
+    this.patrolSpeed = rand(0.16, 0.34);
+    return this;
+  }
+
+  /** Vaknar ur sin post och börjar bete sig som vanligt. */
+  wake(ctx) {
+    if (!this.guard) return;
+    this.guard = false;
+    this.state = 'idle';
+    ctx.particles.burst(this.pos.x, this.pos.y + this.height * 0.95, this.pos.z, 6, {
+      speed: 4, life: 0.45, size: 0.35, size2: 0.05,
+      col: [1.0, 0.8, 0.35], alpha: 0.9, drag: 0.6, grav: -3,
+    });
+    if (this.boss && ctx.onBossWake) ctx.onBossWake(this);
   }
 
   damage(n, ctx, crit) {
@@ -131,7 +159,21 @@ export class Enemy {
 
     let wishX = 0, wishZ = 0, speed = this.speed * slowF;
 
-    switch (this.def.ai) {
+    // Vakter (äventyrsläget) driver runt sin lägerplats tills spelaren kommer
+    // nära, tills de blir träffade eller tills nivån hetsar dem.
+    if (this.guard && (dist < this.aggroRange || this.hp < this.maxHp || this.enrage)) this.wake(ctx);
+    const guarding = this.guard;
+    if (guarding) {
+      const a = this.phase * this.patrolSpeed;
+      const tx = this.home.x + Math.cos(a) * this.patrolR - this.pos.x;
+      const tz = this.home.z + Math.sin(a) * this.patrolR - this.pos.z;
+      const tl = Math.hypot(tx, tz) || 1;
+      wishX = tx / tl; wishZ = tz / tl;
+      speed = this.speed * 0.22;
+    }
+
+    // 'vakt' matchar ingen gren: monstret gör inget av sin vanliga AI.
+    switch (guarding ? 'vakt' : this.def.ai) {
       case 'melee':
         wishX = nx; wishZ = nz;
         break;
@@ -377,6 +419,10 @@ export class Enemy {
       let wantY;
       if (this.def.ai === 'sniper' && this.perch) {
         wantY = this.perch.h + 1.0;
+      } else if (guarding) {
+        // en vakt svävar över sitt eget läger, inte över spelaren
+        wantY = terrainHeight(this.home.x, this.home.z)
+          + (this.def.ai === 'hover' ? 2.6 : 2.2) + Math.sin(this.phase * 1.7) * 0.5;
       } else {
         const off = this.def.ai === 'drone'
           ? (this.state === 'dive' || this.enrage ? 0.5 : 4.5)
@@ -400,8 +446,12 @@ export class Enemy {
     if (this.pos.y <= gh) { this.pos.y = gh; this.vel.y = 0; this.grounded = true; }
     else this.grounded = false;
 
-    // vänd mot spelaren — hover-plattformen vrider sig trögt, därav flanken
-    this.yaw += angleDelta(this.yaw, Math.atan2(nx, nz)) * Math.min(1, dt * (this.def.turn || 8));
+    // vänd mot spelaren — hover-plattformen vrider sig trögt, därav flanken.
+    // En vakt tittar dit den går i stället, den vet ju inte om dig än.
+    const face = guarding && this.planar > 0.25
+      ? Math.atan2(this.vel.x, this.vel.z)
+      : Math.atan2(nx, nz);
+    this.yaw += angleDelta(this.yaw, face) * Math.min(1, dt * (this.def.turn || 8));
     this.phase += dt;
     this.shieldFlash = Math.max(0, this.shieldFlash - dt * 3);
     this.planar = Math.hypot(this.vel.x, this.vel.z);

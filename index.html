@@ -61,7 +61,19 @@
     border-color:#fff;animation:comboPulse .55s infinite alternate}
   @keyframes comboPulse{from{transform:scale(1)}to{transform:scale(1.45)}}
 
+  /* uppdragsraden i äventyret */
+  #objective{position:absolute;top:60px;left:50%;transform:translateX(-50%);
+    display:flex;align-items:center;gap:10px;background:var(--panel);
+    border:1px solid var(--line);border-left:3px solid var(--gold);border-radius:8px;
+    padding:6px 14px;backdrop-filter:blur(6px);white-space:nowrap}
+  #objective.hidden{display:none}
+  #objLabel{font-size:10px;letter-spacing:.2em;opacity:.7}
+  #objValue{font-size:14px;font-weight:800;color:var(--gold);font-variant-numeric:tabular-nums}
+  #objective.done{border-left-color:var(--good)} #objective.done #objValue{color:var(--good)}
+
   #bossBar{position:absolute;top:76px;left:50%;transform:translateX(-50%);width:min(520px,70vw)}
+  /* med uppdragsraden på plats får bosshälsan flytta ner */
+  #hud.obj #bossBar{top:112px}
   #bossBar .name{font-size:11px;letter-spacing:.25em;text-align:center;margin-bottom:4px;
     color:var(--hot);text-shadow:0 0 12px var(--hot)}
   #bossBar .bar{height:14px;border-color:rgba(255,61,127,.5)}
@@ -135,6 +147,8 @@
     #verTag{display:none}
     .topbar{top:8px;gap:5px;transform:translateX(-50%) scale(.82);transform-origin:top center}
     #minimap{width:96px;height:96px;right:10px;top:64px;bottom:auto}
+    #objective{top:46px;transform:translateX(-50%) scale(.85)}
+    #hud.obj #bossBar{top:92px}
     #bottom{width:min(300px,68vw);bottom:auto;top:112px;left:14px;transform:none}
     .bar{height:14px} .bar.xp{height:7px} #hpText{font-size:10px}
     .pip{width:30px;height:5px}
@@ -144,8 +158,9 @@
     .cards{gap:10px} .card{width:min(260px,80vw);padding:14px 12px}
     .card .icon{font-size:30px;margin-bottom:6px}
     .keys{gap:6px} .key{padding:7px 10px;font-size:11px}
-    .worlds{gap:12px} .world{width:min(300px,86vw);padding:16px 14px}
-    .world .wDesc{min-height:0}
+    .worlds,.modes{gap:12px}
+    .world,.mode{width:min(300px,86vw);padding:16px 14px}
+    .world .wDesc,.mode .wDesc{min-height:0}
     .screen{padding:18px 14px}
     .results{gap:8px} .result{padding:10px 14px;min-width:88px} .result .rv{font-size:20px}
   }
@@ -194,13 +209,28 @@
   .world:hover{transform:translateY(-6px)}
   .world.wild:hover{border-color:#4dffa6;box-shadow:0 16px 50px rgba(77,255,166,.25)}
   .world.city:hover{border-color:var(--hot);box-shadow:0 16px 50px rgba(255,61,127,.3)}
-  .world .wIcon{font-size:44px;line-height:1;margin-bottom:10px}
-  .world .wName{font-size:20px;font-weight:900;letter-spacing:.18em;margin-bottom:8px}
+  .world .wIcon,.mode .wIcon{font-size:44px;line-height:1;margin-bottom:10px}
+  .world .wName,.mode .wName{font-size:20px;font-weight:900;letter-spacing:.18em;margin-bottom:8px}
   .world.wild .wName{color:#4dffa6;text-shadow:0 0 18px rgba(77,255,166,.5)}
   .world.city .wName{color:var(--hot);text-shadow:0 0 18px rgba(255,61,127,.55)}
-  .world .wDesc{font-size:12px;line-height:1.55;opacity:.8;min-height:56px}
-  .world .wTag{margin-top:10px;font-size:9px;letter-spacing:.25em;opacity:.55;
+  .world .wDesc,.mode .wDesc{font-size:12px;line-height:1.55;opacity:.8;min-height:56px}
+  .world .wTag,.mode .wTag{margin-top:10px;font-size:9px;letter-spacing:.25em;opacity:.55;
     border-top:1px solid rgba(255,255,255,.12);padding-top:8px}
+
+  /* spelsättsval — samma kortform som världarna, egna färger */
+  .modes{display:flex;gap:18px;justify-content:center;flex-wrap:wrap;margin:6px 0 22px}
+  .mode{pointer-events:auto;cursor:pointer;width:min(300px,42vw);padding:22px 18px 16px;
+    border-radius:16px;text-align:center;position:relative;border:1px solid var(--line);
+    transition:transform .14s,box-shadow .14s,border-color .14s}
+  .mode.surv{background:linear-gradient(165deg,rgba(14,44,66,.92),rgba(5,12,22,.95))}
+  .mode.adv{background:linear-gradient(165deg,rgba(58,44,12,.92),rgba(18,12,5,.95))}
+  .mode:hover{transform:translateY(-6px)}
+  .mode.surv:hover{border-color:var(--neon);box-shadow:0 16px 50px rgba(77,243,255,.28)}
+  .mode.adv:hover{border-color:var(--gold);box-shadow:0 16px 50px rgba(255,204,77,.28)}
+  .mode.surv .wName{color:var(--neon);text-shadow:0 0 18px rgba(77,243,255,.5)}
+  .mode.adv .wName{color:var(--gold);text-shadow:0 0 18px rgba(255,204,77,.55)}
+  .hint.back{pointer-events:auto;cursor:pointer;margin-top:10px}
+  .hint.back:hover{opacity:.8}
 
   /* level up */
   .lvlTitle{font-size:15px;letter-spacing:.45em;color:var(--gold);
@@ -234,11 +264,15 @@
 
 <div id="hud" class="hidden">
   <div class="topbar">
-    <div class="stat"><span class="label">VÅG</span><span id="waveNum">1</span></div>
-    <div class="stat"><span class="label">NIVÅ</span><span id="levelNum">1</span></div>
+    <div class="stat"><span class="label" id="waveLbl">VÅG</span><span id="waveNum">1</span></div>
+    <div class="stat"><span class="label" id="levelLbl">NIVÅ</span><span id="levelNum">1</span></div>
     <div class="stat"><span class="label">KILLS</span><span id="killNum">0</span></div>
     <div class="stat"><span class="label">TID</span><span id="timeNum">0:00</span></div>
     <div class="stat"><span class="label">FPS</span><span id="fpsNum">—</span></div>
+  </div>
+
+  <div id="objective" class="hidden">
+    <span id="objLabel">UPPDRAG</span><span id="objValue">—</span>
   </div>
 
   <div id="bossBar" class="hidden">

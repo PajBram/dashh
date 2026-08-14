@@ -17,11 +17,31 @@ OUT = ROOT / "dist" / "dashh.html"
 ORDER = [
     "math.js", "noise.js", "meshes.js", "gl.js", "shaders.js", "terrain.js",
     "renderer.js", "audio.js", "input.js", "upgrades.js", "player.js",
-    "enemies.js", "combat.js", "hud.js", "game.js", "main.js",
+    "enemies.js", "missions.js", "adventure.js", "combat.js", "hud.js", "game.js", "main.js",
 ]
 
 IMPORT_RE = re.compile(r"^import\s.*?;\s*$", re.M | re.S)
 EXPORT_KW_RE = re.compile(r"^export\s+(?=(?:const|let|var|function|class)\b)", re.M)
+# namn deklarerade längst ut i en modul (utan indrag)
+TOPLEVEL_RE = re.compile(r"^(?:const|let|var|function|class)\s+([A-Za-z_$][\w$]*)", re.M)
+
+
+def check_collisions(modules: dict) -> None:
+    """
+    Alla moduler hamnar i samma namnrymd i enfilsversionen. Två filer som
+    döper något till samma sak funkar därför i src/ men ger en vit skärm i
+    dist/ — det ska upptäckas här, inte av den som spelar.
+    """
+    seen = {}
+    clashes = []
+    for name, code in modules.items():
+        for decl in set(TOPLEVEL_RE.findall(code)):
+            if decl in seen:
+                clashes.append(f"{decl} finns i både {seen[decl]} och {name}")
+            else:
+                seen[decl] = name
+    if clashes:
+        sys.exit("namnkrock mellan moduler:\n  " + "\n  ".join(clashes))
 
 
 def strip_module_syntax(code: str, name: str) -> str:
@@ -40,11 +60,11 @@ def main() -> None:
     if missing or extra:
         sys.exit(f"ORDER stämmer inte med src/: saknas={missing} okända={extra}")
 
-    parts = []
+    modules = {}
     for name in ORDER:
-        code = strip_module_syntax((SRC / name).read_text(encoding="utf-8"), name)
-        parts.append(f"// ═══ {name} ═══\n{code}")
-    bundle = "\n\n".join(parts)
+        modules[name] = strip_module_syntax((SRC / name).read_text(encoding="utf-8"), name)
+    check_collisions(modules)
+    bundle = "\n\n".join(f"// ═══ {n} ═══\n{c}" for n, c in modules.items())
 
     html = (ROOT / "index.html").read_text(encoding="utf-8")
     tag = '<script type="module" src="src/main.js"></script>'

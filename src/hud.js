@@ -35,6 +35,9 @@ export class HUD {
     this.stick = $('stick');
     this.knob = $('knob');
     this.tFire = $('tFire');
+    this.objective = $('objective');
+    this.objLabel = $('objLabel');
+    this.objValue = $('objValue');
     this.map = $('minimap');
     this.mapCtx = this.map.getContext('2d');
     this.bannerT = 0;
@@ -43,6 +46,13 @@ export class HUD {
   }
 
   showHUD(on) { this.hud.classList.toggle('hidden', !on); }
+
+  /** Toppraden heter olika saker i de två spelsätten. */
+  setMode(mode) {
+    const adv = mode === 'adventure';
+    $('waveLbl').textContent = adv ? 'NIVÅ' : 'VÅG';
+    $('levelLbl').textContent = adv ? 'RANG' : 'NIVÅ';
+  }
 
   // ------------------------------------------------------- skadesiffror
 
@@ -150,6 +160,18 @@ export class HUD {
     this.bossBar.classList.toggle('hidden', !e);
   }
 
+  /** Uppdragsraden: vad nivån kräver och hur långt det gått. */
+  setObjective(mission) {
+    const on = !!mission;
+    this.objective.classList.toggle('hidden', !on);
+    this.hud.classList.toggle('obj', on);
+    if (!on) return;
+    if (this.objLabel.textContent !== mission.label) this.objLabel.textContent = mission.label;
+    const v = mission.status;
+    if (this.objValue.textContent !== v) this.objValue.textContent = v;
+    this.objective.classList.toggle('done', mission.done);
+  }
+
   /** Uppdaterar allt som ändras varje bildruta. */
   update(g, dt) {
     const p = g.player;
@@ -215,7 +237,11 @@ export class HUD {
       this.comboRow.classList.add('hidden');
     }
 
-    $('waveNum').textContent = g.waves.wave || '—';
+    this.setObjective(g.mode === 'adventure' ? g.adventure.mission : null);
+
+    $('waveNum').textContent = g.mode === 'adventure'
+      ? (g.adventure.level || '—')
+      : (g.waves.wave || '—');
     $('levelNum').textContent = g.level;
     $('killNum').textContent = g.kills;
     const t = Math.floor(g.elapsed);
@@ -279,15 +305,50 @@ export class HUD {
       c.fillStyle = q.kind === 'xp' ? '#4dffa6' : '#ff5b7f';
       c.fillRect(x - 2, y - 2, 4, 4);
     }
+    const adv = g.mode === 'adventure';
     for (const e of g.enemies) {
       if (!e.alive) continue;
-      const [x, y] = plot(e.pos.x, e.pos.z);
+      let [x, y] = plot(e.pos.x, e.pos.z);
+      let r = e.boss ? 9 : e.type === 'tank' ? 6 : 4.5;
+      const off = Math.hypot(x - R, y - R);
+      if (off > R - 6) {
+        // I äventyret måste man kunna hitta monstren: det som ligger utanför
+        // radarns räckvidd fästs som en liten prick vid kanten i rätt riktning.
+        if (!adv) continue;
+        const s = (R - 7) / off;
+        x = R + (x - R) * s; y = R + (y - R) * s;
+        r = e.boss ? 5 : 2.6;
+      }
       c.fillStyle = DOT_COL[e.type] || '#fff';
+      // vakter som ännu inte upptäckt dig ligger blekare på radarn
+      c.globalAlpha = e.guard ? 0.4 : 0.85;
       c.beginPath();
-      c.arc(x, y, e.boss ? 9 : e.type === 'tank' ? 6 : 4.5, 0, Math.PI * 2);
+      c.arc(x, y, r, 0, Math.PI * 2);
       c.fill();
     }
     c.globalAlpha = 1;
+
+    // Uppdragsmålen: romber som alltid syns, även utanför radarns räckvidd.
+    // Utan dem blir "hitta tre kraftkärnor" bara irrande.
+    const marks = adv && g.adventure.mission ? g.adventure.mission.markers() : [];
+    for (const m of marks) {
+      let [x, y] = plot(m.x, m.z);
+      const off = Math.hypot(x - R, y - R);
+      let s = 5;
+      if (off > R - 8) {
+        const k = (R - 9) / off;
+        x = R + (x - R) * k; y = R + (y - R) * k;
+        s = 3.5;
+      }
+      c.save();
+      c.translate(x, y);
+      c.rotate(Math.PI / 4);
+      c.fillStyle = m.col;
+      c.shadowColor = m.col;
+      c.shadowBlur = 6;
+      c.fillRect(-s, -s, s * 2, s * 2);
+      c.restore();
+    }
 
     // spelaren + blickriktning
     c.fillStyle = '#eaf6ff';
@@ -303,7 +364,38 @@ export class HUD {
 
   // ------------------------------------------------------------- menyskärmar
 
-  showStart(onPick, touch) {
+  /** Första skärmen: vilket spelsätt? */
+  showModes(onPick) {
+    this._cursor = null;
+    this.showOverlay(`
+      <div class="screen">
+        <div class="title">DASHH</div>
+        <div class="subtitle">VOIDFALL<span class="betaTag">${VERSION}</span></div>
+        <div class="betaNote">tidig version — buggar och konstigheter förekommer, säg gärna till</div>
+        <div class="modes">
+          <div class="mode surv" data-m="survival">
+            <div class="wIcon">🌊</div>
+            <div class="wName">ÖVERLEVNAD</div>
+            <div class="wDesc">En arena, våg efter våg, boss var femte.
+              Det slutar bara på ett sätt — frågan är hur långt du kom.</div>
+            <div class="wTag">ETT ENDA LÅNGT ANDETAG</div>
+          </div>
+          <div class="mode adv" data-m="adventure">
+            <div class="wIcon">🗺️</div>
+            <div class="wName">ÄVENTYR</div>
+            <div class="wDesc">Nivå efter nivå på egna kartor. Monstren står utplacerade
+              och väntar — leta upp dem. Boss var tredje nivå.</div>
+            <div class="wTag">NYTT · BYGGS UT</div>
+          </div>
+        </div>
+        <div class="hint">välj spelsätt</div>
+      </div>`);
+    this.overlay.querySelectorAll('.mode').forEach((el) => {
+      el.addEventListener('click', () => onPick(el.dataset.m));
+    });
+  }
+
+  showStart(onPick, touch, mode = 'survival', onBack = null) {
     this._cursor = null;
     const keys = touch ? `
           <div class="key"><b>VÄNSTER HALVA</b> Spak — rör dig</div>
@@ -319,10 +411,11 @@ export class HUD {
           <div class="key"><b>SHIFT</b> Dash</div>
           <div class="key"><b>MELLANSLAG</b> Hoppa / flyg</div>
           <div class="key"><b>ESC</b> Paus</div>`;
+    const adv = mode === 'adventure';
     this.showOverlay(`
       <div class="screen">
         <div class="title">DASHH</div>
-        <div class="subtitle">VOIDFALL<span class="betaTag">${VERSION}</span></div>
+        <div class="subtitle">${adv ? 'ÄVENTYR' : 'ÖVERLEVNAD'}<span class="betaTag">${VERSION}</span></div>
         <div class="betaNote">tidig version — buggar och konstigheter förekommer, säg gärna till</div>
         <div class="worlds">
           <div class="world wild" data-w="wild">
@@ -341,11 +434,50 @@ export class HUD {
           </div>
         </div>
         <div class="keys">${keys}</div>
-        <div class="hint">välj din värld — överlev vågorna</div>
+        <div class="hint">välj din värld — ${adv ? 'du stannar i den hela äventyret' : 'överlev vågorna'}</div>
+        ${onBack ? '<div class="hint back" id="btnBack">← tillbaka till spelsätt</div>' : ''}
       </div>`);
     this.overlay.querySelectorAll('.world').forEach((el) => {
       el.addEventListener('click', () => onPick(el.dataset.w));
     });
+    if (onBack) $('btnBack').addEventListener('click', onBack);
+  }
+
+  /** Uppdraget gick förlorat — samma nivå görs om. */
+  showFailed(g, mission, onRetry) {
+    this.showOverlay(`
+      <div class="screen">
+        <div class="goTitle" style="font-size:clamp(34px,7vw,64px)">UPPDRAGET MISSLYCKADES</div>
+        <div class="hint" style="margin:10px 0 0">${mission ? mission.title : ''}</div>
+        <div class="results">
+          <div class="result"><div class="rl">NIVÅ</div><div class="rv">${g.adventure.level}</div></div>
+          <div class="result"><div class="rl">KILLS</div><div class="rv">${g.kills}</div></div>
+        </div>
+        <button class="cta" id="btnRetry">FÖRSÖK IGEN</button>
+        <div class="hint">nivån börjar om — du behåller allt du skaffat</div>
+      </div>`);
+    $('btnRetry').addEventListener('click', onRetry);
+  }
+
+  /** Mellan två nivåer. Här kommer shoppen att ligga. */
+  showInterlude(g, onContinue) {
+    const t = Math.floor(g.elapsed);
+    const next = g.adventure.level + 1;
+    const boss = g.adventure.isBossLevel(next);
+    this.showOverlay(`
+      <div class="screen">
+        <div class="lvlTitle">NIVÅ ${g.adventure.level} KLARAD</div>
+        <div class="lvlSub">${boss ? 'NÄSTA: BOSS' : `NÄSTA: NIVÅ ${next}`}</div>
+        <div class="hint" style="margin:-16px 0 18px">${g.adventure.mission ? g.adventure.mission.title : ''}</div>
+        <div class="results">
+          <div class="result"><div class="rl">KILLS</div><div class="rv">${g.kills}</div></div>
+          <div class="result"><div class="rl">RANG</div><div class="rv">${g.level}</div></div>
+          <div class="result"><div class="rl">TID</div><div class="rv">${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}</div></div>
+        </div>
+        <button class="cta" id="btnNext">${boss ? 'MÖT BOSSEN' : 'VIDARE'}</button>
+        <div class="hint">här kommer shoppen att ligga — ännu inte byggd</div>
+      </div>`);
+    $('btnNext').addEventListener('click', onContinue);
   }
 
   showLevelUp(level, choices, onPick) {
@@ -380,20 +512,26 @@ export class HUD {
 
   showGameOver(g, onRestart, onMenu) {
     const t = Math.floor(g.elapsed);
+    const adv = g.mode === 'adventure';
+    const best = adv
+      ? `bäst hittills: nivå ${g.best.stage} · ${g.best.kills} kills`
+      : `bäst hittills: våg ${g.best.wave} · ${g.best.kills} kills`;
     this.showOverlay(`
       <div class="screen">
         <div class="goTitle">DU FÖLL</div>
-        <div class="hint" style="margin:4px 0 0">${g.worldId === 'city' ? 'NEOTROPOLIS' : 'VILDHEIM'}</div>
+        <div class="hint" style="margin:4px 0 0">${g.worldId === 'city' ? 'NEOTROPOLIS' : 'VILDHEIM'}
+          · ${adv ? 'ÄVENTYR' : 'ÖVERLEVNAD'}</div>
         <div class="results">
-          <div class="result"><div class="rl">VÅG</div><div class="rv">${g.waves.wave}</div></div>
-          <div class="result"><div class="rl">NIVÅ</div><div class="rv">${g.level}</div></div>
+          <div class="result"><div class="rl">${adv ? 'NIVÅ' : 'VÅG'}</div>
+            <div class="rv">${adv ? g.adventure.level : g.waves.wave}</div></div>
+          <div class="result"><div class="rl">${adv ? 'RANG' : 'NIVÅ'}</div><div class="rv">${g.level}</div></div>
           <div class="result"><div class="rl">KILLS</div><div class="rv">${g.kills}</div></div>
           <div class="result"><div class="rl">TID</div><div class="rv">${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}</div></div>
           <div class="result"><div class="rl">SKADA</div><div class="rv">${Math.round(g.damageDealt)}</div></div>
         </div>
         <button class="cta" id="btnRestart">SPELA IGEN</button>
-        <button class="cta alt" id="btnMenu">BYT VÄRLD</button>
-        <div class="hint">bäst hittills: våg ${g.best.wave} · ${g.best.kills} kills</div>
+        <button class="cta alt" id="btnMenu">TILL MENYN</button>
+        <div class="hint">${best}</div>
       </div>`);
     $('btnRestart').addEventListener('click', onRestart);
     $('btnMenu').addEventListener('click', onMenu);

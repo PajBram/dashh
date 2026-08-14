@@ -6,6 +6,7 @@ import { Sound } from './audio.js';
 import { HUD } from './hud.js';
 import { Player } from './player.js';
 import { Enemy, WaveManager } from './enemies.js';
+import { AdventureManager } from './adventure.js';
 import { Combat } from './combat.js';
 import { rollChoices } from './upgrades.js';
 import { terrainHeight, WATER_LEVEL } from './noise.js';
@@ -23,10 +24,12 @@ export class Game {
     this.hud = new HUD();
     this.combat = new Combat();
     this.waves = new WaveManager();
+    this.adventure = new AdventureManager();
     this.player = new Player(this);
     this.enemies = [];
     this.state = 'menu';
     this.worldId = 'wild';
+    this.mode = 'survival';   // 'survival' = vågor, 'adventure' = nivåer
     this.usedLock = false;
     this.best = this.loadBest();
     this.fps = 60;
@@ -46,15 +49,22 @@ export class Game {
   // ---------------------------------------------------------------- tillstånd
 
   loadBest() {
+    const empty = { wave: 0, kills: 0, stage: 0 };
     try {
-      return JSON.parse(localStorage.getItem('dashh.best')) || { wave: 0, kills: 0 };
-    } catch (e) { return { wave: 0, kills: 0 }; }
+      return Object.assign(empty, JSON.parse(localStorage.getItem('dashh.best')));
+    } catch (e) { return empty; }
   }
 
   saveBest() {
     this.best.wave = Math.max(this.best.wave, this.waves.wave);
+    this.best.stage = Math.max(this.best.stage, this.adventure.level);
     this.best.kills = Math.max(this.best.kills, this.kills);
     try { localStorage.setItem('dashh.best', JSON.stringify(this.best)); } catch (e) { /* ignoreras */ }
+  }
+
+  /** Svårighetstrappan: vågnummer i överlevnad, nivånummer i äventyret. */
+  get tier() {
+    return this.mode === 'adventure' ? Math.max(1, this.adventure.level) : this.waves.wave;
   }
 
   resetRun() {
@@ -62,6 +72,7 @@ export class Game {
     this.enemies.length = 0;
     this.combat.reset();
     this.waves.reset();
+    this.adventure.reset();
     this.particles.list.length = 0;
     this.upgradeLevels = new Map();
     this.level = 1;
@@ -75,12 +86,14 @@ export class Game {
     this.pendingLevelUps = 0;
     this.ambientTimer = 0;
     this.hitstop = 0;
+    this.interludeT = 0;
     this.hud.clearFloaters();
     this.hud.setBoss(null);
   }
 
-  start(worldId) {
+  start(worldId, mode) {
     if (worldId) this.worldId = worldId;
+    if (mode) this.mode = mode;
     this.renderer.buildWorld(this.worldId);
     this.colliders = this.renderer.props.grid;
     this.buildings = this.renderer.props.buildings || null;   // taksnipern behöver dem
@@ -89,9 +102,11 @@ export class Game {
     this.resetRun();
     this.state = 'playing';
     this.hud.hideOverlay();
+    this.hud.setMode(this.mode);
     this.hud.showHUD(true);
-    if (this.worldId === 'city') this.hud.showBanner('NEOTROPOLIS', 'håll mellanslag — flyg', 3);
-    else this.hud.showBanner('VILDHEIM', 'vågorna kommer');
+    const adv = this.mode === 'adventure';
+    if (this.worldId === 'city') this.hud.showBanner('NEOTROPOLIS', adv ? 'ge dig ut i staden' : 'håll mellanslag — flyg', 3);
+    else this.hud.showBanner('VILDHEIM', adv ? 'ge dig ut på kartan' : 'vågorna kommer');
     this.input.enabled = true;
     if (!this.input.touch) this.input.requestLock();
   }
@@ -101,7 +116,13 @@ export class Game {
     this.input.enabled = false;
     this.input.releaseLock();
     this.hud.showHUD(false);
-    this.hud.showStart((w) => this.start(w), this.input.touch);
+    this.hud.showModes((m) => this.chooseMode(m));
+  }
+
+  /** Spelsättet är valt — nu väljer man värld. */
+  chooseMode(mode) {
+    this.mode = mode;
+    this.hud.showStart((w) => this.start(w, mode), this.input.touch, mode, () => this.showMenu());
   }
 
   pause() {
@@ -148,22 +169,44 @@ export class Game {
   /** Skadesiffra som flyger upp ur fienden. */
   floater(x, y, z, amount, crit, key) { this.hud.floater(x, y, z, amount, crit, key); }
 
-  spawnEnemy(type, x, z) {
-    const e = new Enemy(type, x, z, this.waves.wave, this.worldId);
+  /**
+   * `quiet` används av äventyret: monstren står redan på kartan när nivån
+   * börjar, så de ska varken ryka in ur tomma intet eller basunera ut sig.
+   */
+  spawnEnemy(type, x, z, quiet = false) {
+    const e = new Enemy(type, x, z, this.tier, this.worldId);
     this.enemies.push(e);
-    this.particles.burst(x, terrainHeight(x, z) + 1, z, e.boss ? 40 : 12, {
-      speed: e.boss ? 14 : 6, life: 0.6, size: e.boss ? 1.4 : 0.6,
-      col: e.col, alpha: 0.9, drag: 0.7, grav: -4,
-    });
-    if (e.boss) {
-      const city = this.worldId === 'city';
-      this.hud.setBoss(e, city ? 'OVERSEER' : 'VOIDLORD');
-      this.hud.showBanner('BOSS', city ? 'overseer aktiveras' : 'voidlord stiger upp', 3);
-      this.sound.bossSpawn();
-      this.player.shake = 1.2;
+    if (!quiet) {
+      this.particles.burst(x, terrainHeight(x, z) + 1, z, e.boss ? 40 : 12, {
+        speed: e.boss ? 14 : 6, life: 0.6, size: e.boss ? 1.4 : 0.6,
+        col: e.col, alpha: 0.9, drag: 0.7, grav: -4,
+      });
+      if (e.boss) this.announceBoss(e);
     }
     return e;
   }
+
+  /**
+   * En ny äventyrsnivå är en ny karta: det som var kvar av den förra —
+   * monster man gick förbi, skott i luften, orbs på marken — försvinner.
+   * Utan det staplas monstren på varandra nivå för nivå.
+   */
+  clearScene() {
+    this.enemies.length = 0;
+    this.combat.reset();
+    this.hud.setBoss(null);
+  }
+
+  /** Bosshälsan och fanfaren — i äventyret först när man stöter på den. */
+  announceBoss(e) {
+    const city = this.worldId === 'city';
+    this.hud.setBoss(e, city ? 'OVERSEER' : 'VOIDLORD');
+    this.hud.showBanner('BOSS', city ? 'overseer aktiveras' : 'voidlord stiger upp', 3);
+    this.sound.bossSpawn();
+    this.player.shake = 1.2;
+  }
+
+  onBossWake(e) { this.announceBoss(e); }
 
   spawnEnemyBullet(e, target, speed, dmg) { this.combat.enemyBullet(e, target, speed, dmg); }
   spawnEnemyBulletDir(e, dx, dy, dz, speed, dmg) { this.combat.enemyBulletDir(e, dx, dy, dz, speed, dmg); }
@@ -171,6 +214,7 @@ export class Game {
 
   onEnemyKilled(e) {
     this.kills++;
+    this.adventure.onKill();
     this.sound.kill();
     this.particles.burst(e.pos.x, e.pos.y + e.height * 0.5, e.pos.z, e.boss ? 60 : 16, {
       speed: e.boss ? 16 : 8, life: e.boss ? 1.2 : 0.55, size: e.boss ? 1.5 : 0.6, size2: 0.1,
@@ -231,6 +275,59 @@ export class Game {
     this.player.heal(this.player.stats.maxHp * 0.08);
   }
 
+  // ------------------------------------------------------------- äventyret
+
+  onLevelStart(level, isBoss, plan, mission) {
+    this.hud.showBanner(`NIVÅ ${level}`, mission ? mission.title.toLowerCase() : '', 2.6);
+    this.sound.waveStart();
+    if (level === 1) this.toast('Radarn visar uppdragsmålen — gula och blå prickar');
+    else if (plan.size === 'lång') this.toast('Stor karta den här gången');
+  }
+
+  onLevelClear(level) {
+    this.hud.showBanner('NIVÅ KLARAD', '', 2.2);
+    this.sound.levelUp();
+    this.player.heal(this.player.stats.maxHp * 0.15);
+    this.interludeT = 2.0;      // en andhämtning innan mellanskärmen
+  }
+
+  /** Uppdraget gick om intet — nivån görs om från början. */
+  onLevelFailed(level, mission) {
+    this.hud.showBanner('UPPDRAGET MISSLYCKADES', '', 2.4);
+    this.sound.gameOver();
+    this.state = 'failed';
+    this.input.enabled = false;
+    this.input.releaseLock();
+    this.hud.setBoss(null);
+    setTimeout(() => {
+      if (this.state !== 'failed') return;
+      this.hud.showFailed(this, mission, () => {
+        this.enemies.length = 0;
+        this.combat.reset();
+        this.adventure.retryLevel();
+        this.continueRun();
+      });
+    }, 1200);
+  }
+
+  openInterlude() {
+    this.state = 'interlude';
+    this.input.enabled = false;
+    this.input.releaseLock();
+    this.hud.showInterlude(this, () => this.continueRun());
+  }
+
+  /** Vidare från mellanskärmen till nästa nivå. */
+  continueRun() {
+    this.hud.hideOverlay();
+    this.adventure.nextLevel();
+    if (this.pendingLevelUps > 0) { this.openLevelUp(); return; }
+    this.state = 'playing';
+    this.input.enabled = true;
+    if (!this.input.touch) this.input.requestLock();
+    this.sound.resume();
+  }
+
   // ------------------------------------------------------------------ update
 
   update(dt) {
@@ -270,7 +367,13 @@ export class Game {
       } else p.droneTimer = 0.3;
     }
 
-    this.waves.update(dt, this);
+    if (this.mode === 'adventure') {
+      this.adventure.update(dt, this);
+      if (this.interludeT > 0) {
+        this.interludeT -= dt;
+        if (this.interludeT <= 0) this.openInterlude();
+      }
+    } else this.waves.update(dt, this);
 
     for (const e of this.enemies) {
       if (e.alive) e.update(dt, this);
@@ -314,6 +417,7 @@ export class Game {
     if (p.alive) p.draw(r, this.time);
     for (const e of this.enemies) e.draw(r, this.time);
     this.combat.draw(r, this.time);
+    if (this.mode === 'adventure') this.adventure.draw(r, this.time);
     r.render(p.camera(this.time), this.env, this.time, p.pos);
   }
 
@@ -331,6 +435,9 @@ export class Game {
       else this.update(dt);
     } else if (this.state === 'paused') {
       if (this.input.pressed('Escape') || this.input.pressed('KeyP')) this.resume();
+    } else if (this.state === 'interlude') {
+      if (this.input.pressed('Space') || this.input.pressed('Enter')) this.continueRun();
+      this.particles.update(dt * 0.25);
     } else if (this.state === 'levelup') {
       for (let i = 0; i < 3; i++) {
         if (this.input.pressed(`Digit${i + 1}`) || this.input.pressed(`Numpad${i + 1}`)) {
@@ -344,7 +451,7 @@ export class Game {
       this.time += dt;
       this.dayTime = (this.dayTime + dt / DAY_LENGTH) % 1;
       this.particles.update(dt);
-      if (this.state !== 'dead') {
+      if (this.state !== 'dead' && this.state !== 'failed') {
         this.player.camYaw += dt * 0.06;
         this.player.updateCamera(dt, 0);
       }

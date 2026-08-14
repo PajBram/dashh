@@ -27,6 +27,11 @@ egen CLAUDE.md. **Översätt inte spelet.**
 4. **Mus och tumme är likvärdiga.** Allt måste gå att spela både med
    tangentbord/mus och med touch. Touchknappar trycker samma virtuella tangenter
    som tangentbordet, så spelogiken slipper veta om fingrar.
+5. **Två spelsätt, samma värld.** `mode` i `game.js` är `survival` (vågor mot
+   arenan, `WaveManager`) eller `adventure` (nivåer med utplacerade läger,
+   `AdventureManager`). Båda använder samma monster, vapen och uppgraderingar —
+   det som skiljer dem är var monstren finns och vad som avslutar en omgång.
+   Äventyret byggs ut stegvis: uppdrag, shop, rustning och egna bossar återstår.
 
 ---
 
@@ -69,7 +74,9 @@ Fullscreen sköts av sajtens egen `static/js/fullscreen.js` — bygg ingen egen.
 | `src/audio.js` | alla ljud syntetiseras i WebAudio |
 | `src/input.js` | tangentbord, mus, pointer lock, touch |
 | `src/player.js` | rörelse, dash, kamerarigg, spelarmodell |
-| `src/enemies.js` | 8 fiendetyper med AI, dödsanimation, vågsystem |
+| `src/enemies.js` | 8 fiendetyper med AI, dödsanimation, vågsystem, vaktläge |
+| `src/missions.js` | äventyrets fyra uppdragstyper + bossuppdraget |
+| `src/adventure.js` | äventyrsläget: nivåer, läger, uppdragsval, skyddsnät |
 | `src/combat.js` | svärd, laser, eldboll, explosioner, drops |
 | `src/upgrades.js` | uppgraderingskorten |
 | `src/hud.js` | HUD, radar, skadesiffror, menyskärmar |
@@ -93,6 +100,21 @@ Fullscreen sköts av sajtens egen `static/js/fullscreen.js` — bygg ingen egen.
   man bort den radiella termen spiralar de in och hamnar **rakt ovanför**
   spelaren, på 60–86° höjdvinkel — dit går det inte att sikta. Då dör de aldrig,
   vågen rensas aldrig och spawningen upphör. Det var en riktig bugg 2026-08-13.
+- **Lägrens avstånd i äventyret.** Vakter vaknar när spelaren är inom ~28 m, så
+  ett läger måste placeras minst 45 m bort (marginal för att lägret sprider sig
+  och för att man rör sig medan nivån laddar). Läggs det närmare vaknar allt i
+  samma stund nivån börjar och rusar mot spelaren — och då är kartan inte en
+  karta, bara en våg som råkade starta längre bort. Det hände i första försöket
+  2026-08-14.
+- **Bundlern har en enda namnrymd.** `tools/bundle.py` klistrar ihop alla
+  moduler i samma scope, så två filer som döper något på toppnivå till samma
+  sak fungerar i `src/` men ger en **vit skärm** i `dist/`. Det hände med
+  `TYPES` (fiendetyper i `enemies.js`, uppdragstyper i `missions.js`) den
+  2026-08-14. Bundlern vägrar numera bygga vid krock — testa alltid
+  `dist/dashh.html`, inte bara `src/`.
+- **En ny äventyrsnivå är en ny karta.** `startLevel` rensar gamla monster,
+  skott och orbs. Utan det ligger allt man gick förbi kvar och staplas nivå
+  för nivå tills kartan är full och spelaren dör i mellanrummet.
 - **Vågens skyddsnät.** Efter 12 s i `clearing` hetsas eftersläntrare att jaga
   spelaren, efter 26 s startar nästa våg ändå. Ta inte bort det: utan det kan en
   enda oåtkomlig fiende låsa hela rundan.
