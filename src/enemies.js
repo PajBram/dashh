@@ -627,9 +627,20 @@ export class Enemy {
       if (dying) { const ny = py * cf - pz * sf; pz = py * sf + pz * cf; py = ny; }
       return [x + csY * px + snY * pz, y + py - dT * 0.3, z - snY * px + csY * pz];
     };
-    const put = (batch, p, sx, sy, sz, col, rx = 0, ryOff = 0, rz = 0, g = 0) =>
+    // Neotropolis: monstren är neonskyltar i natten. Delar i kroppsfärgen
+    // självlyser med en långsam puls, mörka delar får en svag ton så
+    // siluetten hålls ihop — och ljuset slocknar i takt med att de dör.
+    const neon = this.fly
+      ? (0.55 + Math.sin(time * 2.2 + this.phase * 7) * 0.12) * (1 - dT)
+      : 0;
+    const put = (batch, p, sx, sy, sz, col, rx = 0, ryOff = 0, rz = 0, g = 0) => {
+      if (neon > 0) {
+        if (col === c || col === belly) g = Math.max(g, neon);
+        else if (col === dark) g = Math.max(g, 0.16 * (1 - dT));
+      }
       batch.push(p[0], p[1], p[2], sx * shrink, sy * shrink, sz * shrink, col,
         rx + fall, yaw + ryOff, rz, g);
+    };
     const pop = 1 + f * 0.06;                 // liten "träffstuds" i skalan
     const glow = 0.2 + f * 0.9;
     const blink = Math.sin(time * 1.7 + this.phase * 9) > 0.96 ? 0.15 : 1;
