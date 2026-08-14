@@ -11,6 +11,7 @@ const DOT_COL = {
   grunt: '#ff5b5b', spitter: '#c07bff', charger: '#ffab3d',
   tank: '#4ce0a8', boss: '#ff3d7f',
   drone: '#ffd93d', sniper: '#4dffc3', hover: '#8f9bff',
+  vildboss: '#ff3d7f', cityboss: '#ff3d7f',
 };
 
 export class HUD {

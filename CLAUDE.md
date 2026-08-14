@@ -31,8 +31,9 @@ egen CLAUDE.md. **Översätt inte spelet.**
    arenan, `WaveManager`) eller `adventure` (nivåer med utplacerade läger,
    `AdventureManager`). Båda använder samma monster, vapen och uppgraderingar —
    det som skiljer dem är var monstren finns och vad som avslutar en omgång.
-   Äventyret byggs ut stegvis: uppdrag, shop, rustning och checkpoints är på
-   plats, egna bossar återstår.
+   Äventyret är komplett enligt planen: uppdrag, shop, rustning, checkpoints
+   och egna bossar (Jordvredet i Vildheim, Saneraren i Neotropolis — tre
+   faser vid 2/3 och 1/3 hälsa). Vågläget behåller Voidlord/Overseer.
 
    **Två sorters progression i äventyret, med flit:** slumpade
    uppgraderingskort vid nivå-upp (`upgrades.js`) *och* varor man själv
@@ -136,6 +137,10 @@ Fullscreen sköts av sajtens egen `static/js/fullscreen.js` — bygg ingen egen.
   enda oåtkomlig fiende låsa hela rundan.
 - **Kamerans uppåtgräns** är 1,0 rad (~57°) just för att fiender kommer
   ovanifrån i staden. Sänk den inte tillbaka.
+- **Sanerarens cirkling har en radiell term** (`(dist − ring) * 0.15`) av
+  exakt samma skäl som drönarnas: utan den spiralar den in rakt över
+  spelaren där siktet inte når. Uppmätt 23–27 m och ≤6° höjdvinkel — håll
+  det så.
 - **Vapnen låter olika.** Svärdet har låg duns + metallklang, lasern torrt
   högpassat knäpp utan bas, och båda varierar några procent i tonhöjd. Slå inte
   ihop dem till ett gemensamt träffljud igen — det var så det lät förut och det

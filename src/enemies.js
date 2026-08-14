@@ -13,6 +13,10 @@ export const TYPES = {
   drone:  { hp: 14,  speed: 10.5, radius: 0.50, height: 0.9, dmg: 7,  xp: 3,  col: [1.00, 0.85, 0.25], ai: 'drone', turn: 11 },
   sniper: { hp: 34,  speed: 7.6,  radius: 0.70, height: 1.6, dmg: 24, xp: 10, col: [0.35, 1.00, 0.72], ai: 'sniper', turn: 5, cool: 2.6, bullet: 70 },
   hover:  { hp: 155, speed: 3.4,  radius: 1.90, height: 2.0, dmg: 20, xp: 17, col: [0.55, 0.60, 1.00], ai: 'hover', turn: 0.8, cool: 2.4, bullet: 32, shield: true },
+
+  // --- Äventyrets egna bossar: en per värld, med faser vid 2/3 och 1/3 hälsa
+  vildboss: { hp: 760, speed: 3.1, radius: 2.40, height: 5.2, dmg: 30, xp: 120, col: [0.50, 0.53, 0.40], ai: 'vildboss', cool: 1.4, bullet: 22, boss: true, bossName: 'JORDVREDET', bossSub: 'marken reser sig' },
+  cityboss: { hp: 660, speed: 6.2, radius: 2.10, height: 2.6, dmg: 26, xp: 120, col: [0.90, 0.94, 1.00], ai: 'cityboss', cool: 1.3, bullet: 34, boss: true, bossName: 'SANERAREN', bossSub: 'staden städar undan dig', turn: 3 },
 };
 
 // Neotropolis-varianternas neonskal.
@@ -26,7 +30,9 @@ export class Enemy {
     const t = TYPES[type];
     this.type = type;
     this.def = t;
-    this.boss = type === 'boss';
+    this.boss = type === 'boss' || !!t.boss;
+    this.bossPhase = 1;      // äventyrsbossarna trappar upp vid 2/3 och 1/3
+    this.orbitDir = Math.random() < 0.5 ? -1 : 1;
     this.fly = worldId === 'city';
     const hpMul = 1 + (wave - 1) * 0.23 + (wave > 10 ? (wave - 10) * 0.09 : 0);
     this.maxHp = Math.round(t.hp * hpMul);
@@ -143,6 +149,27 @@ export class Enemy {
         col: this.col, alpha: 0.5, drag: 0.4,
       });
     }
+  }
+
+  /**
+   * Äventyrsbossarnas fastrappa: 1 → 2 vid 2/3 hälsa, 2 → 3 vid 1/3.
+   * Bytet märks — frys, stöt, utrop — så att upptrappningen inte smyger.
+   */
+  updateBossPhase(ctx, msg2, msg3) {
+    const frac = this.hp / this.maxHp;
+    const ph = frac <= 1 / 3 ? 3 : frac <= 2 / 3 ? 2 : 1;
+    if (ph > this.bossPhase) {
+      this.bossPhase = ph;
+      this.stateT = Math.min(this.stateT, 0.4);
+      ctx.freeze(0.09);
+      ctx.toast(ph === 2 ? msg2 : msg3);
+      ctx.sound.tone({ f: 60, f2: 160, dur: 0.8, type: 'sawtooth', vol: 0.16 });
+      ctx.particles.burst(this.pos.x, this.pos.y + this.height * 0.6, this.pos.z, 40, {
+        speed: 14, life: 0.8, size: 0.8, size2: 0.1, col: this.col, alpha: 0.95, drag: 0.6, grav: -4,
+      });
+      ctx.player.shake = Math.min(1.6, ctx.player.shake + 0.7);
+    }
+    return this.bossPhase;
   }
 
   update(dt, ctx) {
@@ -380,6 +407,102 @@ export class Enemy {
               }
               ctx.sound.tone({ f: 120, f2: 300, dur: 0.3, type: 'square', vol: 0.10 });
             } else { this.state = 'summon'; this.stateT = 0.8; }
+          }
+        }
+        break;
+      }
+
+      case 'vildboss': {
+        // Jordvredet: stenjätte. Kastar bumlingar i båge på håll, stampar
+        // marken på nära håll. Varje fas gör den snabbare och kasten fler.
+        const ph = this.updateBossPhase(ctx, 'Jordvredet rämnar', 'Jordvredet rasar');
+        const hurry = 1 + (ph - 1) * 0.25;
+        if (this.state === 'stomp') {
+          speed = 0;
+          if (this.stateT <= 0) {
+            ctx.shockwave(this.pos.x, this.pos.y, this.pos.z, 15, this.dmg);
+            // ring av stenskärvor ut från nedslaget — fler för varje fas
+            const n = 8 + ph * 3;
+            for (let i = 0; i < n; i++) {
+              const a = (i / n) * TAU + this.phase;
+              ctx.spawnEnemyBulletDir(this, Math.sin(a), 0.05, Math.cos(a), 17, this.dmg * 0.4);
+            }
+            this.state = 'idle'; this.stateT = rand(2.0, 3.0) / hurry;
+          }
+        } else if (this.state === 'boulder') {
+          speed = 0;
+          if (this.stateT <= 0) {
+            // en bumling per fas, med kort mellanrum i siktet
+            for (let i = 0; i < ph; i++) {
+              const ghost = { pos: {
+                x: p.pos.x + (i ? rand(-6, 6) : 0), y: p.pos.y,
+                z: p.pos.z + (i ? rand(-6, 6) : 0),
+              } };
+              ctx.spawnEnemyLob(this, ghost, this.def.bullet, this.dmg * 0.8, 1.0);
+            }
+            ctx.sound.tone({ f: 90, f2: 45, dur: 0.4, type: 'sawtooth', vol: 0.12 });
+            this.state = 'idle'; this.stateT = rand(1.7, 2.5) / hurry;
+          }
+        } else {
+          wishX = nx; wishZ = nz;
+          speed = this.speed * hurry;
+          if (this.stateT <= 0) {
+            if (dist < 13) { this.state = 'stomp'; this.stateT = 0.9; }
+            else if (dist < 55) { this.state = 'boulder'; this.stateT = 0.7; }
+            else this.stateT = 0.4;   // för långt bort — fortsätt gå
+          }
+        }
+        break;
+      }
+
+      case 'cityboss': {
+        // Saneraren: svävande ringmaskin. Cirklar runt spelaren, fäller ut
+        // solfjädrar av skott, och blinkar till ny vinkel i senare faser.
+        const ph = this.updateBossPhase(ctx, 'Saneraren eskalerar', 'Saneraren renar');
+        const ring = 15;
+        if (this.state === 'sweep') {
+          speed = this.speed * 0.15;
+          if (this.stateT <= 0) {
+            const n = 3 + ph * 2;
+            const spreadA = 0.55;
+            const base = Math.atan2(nx, nz);
+            for (let i = 0; i < n; i++) {
+              const a = base + (i / (n - 1) - 0.5) * spreadA;
+              ctx.spawnEnemyBulletDir(this, Math.sin(a), (p.pos.y + 1.1 - this.pos.y) * 0.02, Math.cos(a),
+                this.def.bullet, this.dmg * 0.6);
+            }
+            ctx.sound.salvo();
+            this.state = 'idle'; this.stateT = rand(1.4, 2.2) / (1 + (ph - 1) * 0.3);
+          }
+        } else if (this.state === 'blink') {
+          speed = 0;
+          if (this.stateT <= 0) {
+            // hoppar ~120° runt spelaren — flanken byts innan siktet hunnit med
+            const cur = Math.atan2(this.pos.x - p.pos.x, this.pos.z - p.pos.z);
+            const next = cur + this.orbitDir * rand(1.6, 2.4);
+            ctx.particles.burst(this.pos.x, this.pos.y + 1, this.pos.z, 22,
+              { speed: 8, life: 0.5, size: 0.5, col: this.col, alpha: 0.9, drag: 0.5 });
+            this.pos.x = p.pos.x + Math.sin(next) * ring;
+            this.pos.z = p.pos.z + Math.cos(next) * ring;
+            this.vel.x = this.vel.z = 0;
+            ctx.particles.burst(this.pos.x, this.pos.y + 1, this.pos.z, 22,
+              { speed: 8, life: 0.5, size: 0.5, col: this.col, alpha: 0.9, drag: 0.5 });
+            ctx.sound.tone({ f: 900, f2: 300, dur: 0.18, type: 'square', vol: 0.08 });
+            this.state = 'idle'; this.stateT = rand(1.2, 1.8);
+          }
+        } else {
+          // cirkla med radiell korrigering — utan den spiralerar den in
+          // rakt över spelaren, precis som drönarna gjorde (se CLAUDE.md)
+          wishX = -nz * this.orbitDir + nx * (dist - ring) * 0.15;
+          wishZ = nx * this.orbitDir + nz * (dist - ring) * 0.15;
+          if (this.fireCd <= 0) {
+            this.fireCd = this.def.cool * rand(0.8, 1.2);
+            ctx.spawnEnemyBullet(this, p, this.def.bullet, this.dmg * 0.5);
+          }
+          if (this.stateT <= 0) {
+            const roll = Math.random();
+            if (ph >= 2 && roll < 0.3) { this.state = 'blink'; this.stateT = 0.45; }
+            else { this.state = 'sweep'; this.stateT = 0.7; }
           }
         }
         break;
@@ -756,6 +879,83 @@ export class Enemy {
         if (this.state === 'slam') {
           B.sphere.push(x, y + 0.2, z, 6 + Math.sin(time * 30) * 1.5, 0.4, 6, [1, 0.4, 0.2], 0, 0, 0, 1.2);
         }
+        break;
+      }
+
+      case 'vildboss': {
+        // Jordvredet: en jätte av staplade stenblock med glödande sprickor.
+        // Glöden går från bärnsten mot rött allteftersom faserna trappas upp.
+        const ph = this.bossPhase;
+        const stone = c, mossy = dark;
+        const ember = ph === 3 ? [1.0, 0.25, 0.12] : ph === 2 ? [1.0, 0.45, 0.10] : [1.0, 0.65, 0.15];
+        const emberGlow = 0.7 + ph * 0.25 + Math.sin(time * (2 + ph)) * 0.2;
+        const rumble = this.state === 'stomp' ? Math.sin(time * 34) * 0.08 : 0;
+        // ben av två grova block
+        for (const s of [-1, 1]) {
+          const step = Math.sin(this.walk * 1.2 + (s > 0 ? 0 : Math.PI)) * 0.3;
+          put(B.box, P(1.05 * s, 0.9, step * 0.5), 0.95, 1.8, 1.05, mossy, step * 0.3, 0, 0, 0);
+          put(B.box, P(1.05 * s, 0.25, step * 0.7), 1.15, 0.5, 1.3, stone, 0, 0, 0, 0);
+        }
+        // höft, bål och bröst — allt något förskjutet, som staplad sten
+        put(B.box, P(0, 2.1 + rumble, 0), 2.5, 1.0, 1.7, stone, 0, 0.06, 0, 0);
+        put(B.box, P(0.1, 3.15 + rumble, 0.1), 2.9, 1.3, 2.0, mossy, 0, -0.08, 0.03, 0);
+        put(B.box, P(-0.05, 4.3 + rumble, 0), 2.4, 1.1, 1.6, stone, 0, 0.1, -0.02, 0);
+        // glödande sprickor mellan blocken
+        put(B.box, P(0, 2.68 + rumble, 0), 2.2, 0.14, 1.5, ember, 0, 0.02, 0, emberGlow);
+        put(B.box, P(0, 3.85 + rumble, 0), 2.0, 0.12, 1.4, ember, 0, -0.04, 0, emberGlow);
+        // hjärtat i bröstet — själva svagheten, ph gör den argare
+        put(B.octa, P(0, 3.3 + rumble, 1.05), 0.5, 0.7, 0.4, ember, 0, time * (1 + ph), 0, emberGlow + 0.4);
+        // huvud: lågt block med två glödande ögon under panna av sten
+        put(B.box, P(0, 5.15 + rumble, 0.2), 1.2, 0.75, 1.1, stone, 0, 0, 0, 0);
+        put(B.box, P(0, 5.5 + rumble, 0.35), 1.35, 0.3, 0.9, mossy, 0.15, 0, 0, 0);
+        for (const s of [-1, 1]) {
+          put(B.box, P(0.32 * s, 5.1 + rumble, 0.72), 0.2, 0.14 * blink, 0.1, ember, 0, 0, 0, emberGlow + 0.3);
+        }
+        // armar: hängande blockkedjor som lyfts i stampen
+        for (const s of [-1, 1]) {
+          const raise = this.state === 'stomp' ? 1.1 - this.stateT : Math.sin(time * 0.9 + s) * 0.1;
+          put(B.box, P(2.05 * s, 3.9 + raise * 0.8, 0.2), 0.85, 1.5, 0.95, mossy, raise * 0.8, 0, 0.15 * s, 0);
+          put(B.box, P(2.15 * s, 2.4 + raise * 1.4, 0.35), 1.05, 1.4, 1.15, stone, raise * 1.2, 0, 0.1 * s, 0);
+        }
+        // fas 3: lösa stenar kretsar kring jätten
+        if (ph >= 3) {
+          for (let i = 0; i < 4; i++) {
+            const a = time * 1.4 + (i / 4) * TAU;
+            B.box.push(x + Math.cos(a) * 4.1, y + 2.8 + Math.sin(a * 2 + i) * 0.9, z + Math.sin(a) * 4.1,
+              0.5, 0.5, 0.5, mossy, a, a * 1.7, 0, 0.1);
+          }
+        }
+        if (this.state === 'stomp') {
+          B.sphere.push(x, y + 0.2, z, 7 + Math.sin(time * 30) * 1.5, 0.4, 7, ember, 0, 0, 0, 1.2);
+        }
+        break;
+      }
+
+      case 'cityboss': {
+        // Saneraren: ett vitt maskinöga i en roterande ring — sterilt, inte
+        // vilt. Ringen snurrar fortare och trimmen blör rödare per fas.
+        const ph = this.bossPhase;
+        const shell = c;
+        const trim = ph === 3 ? [1.0, 0.2, 0.3] : ph === 2 ? [1.0, 0.3, 0.6] : [0.85, 0.2, 0.45];
+        const spin = time * (0.9 + ph * 0.6);
+        const charge = this.state === 'sweep' ? 1.4 : 0.5;
+        // kärnan: öga med lins som följer spelaren via yaw (put roterar med yaw)
+        put(B.sphere, P(0, 1.3, 0), 1.5 * pop, 1.5 * pop, 1.5 * pop, shell, 0, 0, 0, 0.25 + f);
+        put(B.sphere, P(0, 1.3, 1.15), 0.62, 0.62 * blink, 0.4, trim, 0, 0, 0, charge + 0.4);
+        put(B.sphere, P(0, 1.3, 1.38), 0.24, 0.24 * blink, 0.14, [0.05, 0.02, 0.05], 0, 0, 0, 0.2);
+        // roterande ring av plattor
+        for (let i = 0; i < 8; i++) {
+          const a = spin + (i / 8) * TAU;
+          B.box.push(x + Math.cos(a) * 2.5, y + 1.3 + Math.sin(time * 1.8 + i) * 0.1, z + Math.sin(a) * 2.5,
+            0.22, 0.75, 0.5, i % 2 ? shell : trim, 0, a, 0, i % 2 ? 0.15 : 0.7);
+        }
+        // vingpar bakåt
+        for (const s of [-1, 1]) {
+          put(B.box, P(1.35 * s, 1.75, -0.7), 1.1, 0.14, 0.75, shell, 0.1, 0, 0.35 * s, 0.2);
+          put(B.box, P(1.9 * s, 1.95, -0.85), 0.6, 0.09, 0.5, trim, 0.15, 0, 0.5 * s, 0.8);
+        }
+        // svävfältet under
+        B.cyl.push(x, y + 0.15, z, 1.6, 0.08, 1.6, trim, 0, 0, 0, 0.8 + Math.sin(time * 6) * 0.25);
         break;
       }
     }

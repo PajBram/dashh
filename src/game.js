@@ -221,8 +221,10 @@ export class Game {
   /** Bosshälsan och fanfaren — i äventyret först när man stöter på den. */
   announceBoss(e) {
     const city = this.worldId === 'city';
-    this.hud.setBoss(e, city ? 'OVERSEER' : 'VOIDLORD');
-    this.hud.showBanner('BOSS', city ? 'overseer aktiveras' : 'voidlord stiger upp', 3);
+    const name = e.def.bossName || (city ? 'OVERSEER' : 'VOIDLORD');
+    const sub = e.def.bossSub || (city ? 'overseer aktiveras' : 'voidlord stiger upp');
+    this.hud.setBoss(e, name);
+    this.hud.showBanner('BOSS', sub, 3);
     this.sound.bossSpawn();
     this.player.shake = 1.2;
   }
@@ -231,6 +233,7 @@ export class Game {
 
   spawnEnemyBullet(e, target, speed, dmg) { this.combat.enemyBullet(e, target, speed, dmg); }
   spawnEnemyBulletDir(e, dx, dy, dz, speed, dmg) { this.combat.enemyBulletDir(e, dx, dy, dz, speed, dmg); }
+  spawnEnemyLob(e, target, hSpeed, dmg, size) { this.combat.enemyLob(e, target, hSpeed, dmg, size); }
   shockwave(x, y, z, r, dmg) { this.combat.shockwave(this, x, y, z, r, dmg); }
 
   onEnemyKilled(e) {

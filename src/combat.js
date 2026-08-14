@@ -236,6 +236,28 @@ export class Combat {
     });
   }
 
+  /**
+   * Kastad projektil i båge — Jordvredets stenbumlingar. Kastvinkeln räknas
+   * ut ur skottens gravitation (3.2 i update), så stenen landar där spelaren
+   * stod när den kastades. Flytta dig, eller ta smällen.
+   */
+  enemyLob(e, target, hSpeed, dmg, size = 1.0) {
+    const dx = target.pos.x - e.pos.x, dz = target.pos.z - e.pos.z;
+    const d = Math.hypot(dx, dz) || 1;
+    const t = d / hSpeed;
+    const dy = target.pos.y - (e.pos.y + e.height * 0.8);
+    this.bullets.push({
+      x: e.pos.x + (dx / d) * (e.radius + 0.6),
+      y: e.pos.y + e.height * 0.8,
+      z: e.pos.z + (dz / d) * (e.radius + 0.6),
+      vx: (dx / d) * hSpeed,
+      vy: dy / t + 0.5 * 3.2 * t,
+      vz: (dz / d) * hSpeed,
+      life: t + 2, dmg, radius: size, boom: true,
+      col: [0.62, 0.58, 0.48],
+    });
+  }
+
   // -------------------------------------------------------------- explosion
 
   explode(ctx, x, y, z, radius, dmg, source) {
@@ -395,8 +417,10 @@ export class Combat {
         continue;
       }
       if (b.life <= 0 || b.y < terrainHeight(b.x, b.z) - 0.3) {
-        ctx.particles.burst(b.x, b.y, b.z, 5,
-          { speed: 3, life: 0.25, size: 0.35, col: b.col, alpha: 0.7, drag: 0.8 });
+        // stenbumlingen slår ner med en markstöt — även en miss är farlig nära
+        if (b.boom) this.shockwave(ctx, b.x, b.y, b.z, 4.5, b.dmg * 0.7);
+        ctx.particles.burst(b.x, b.y, b.z, b.boom ? 14 : 5,
+          { speed: b.boom ? 7 : 3, life: 0.25, size: b.boom ? 0.6 : 0.35, col: b.col, alpha: 0.7, drag: 0.8 });
         this.bullets.splice(i, 1);
         continue;
       }
@@ -471,7 +495,9 @@ export class Combat {
       }
     }
     for (const b of this.bullets) {
-      B.sphere.push(b.x, b.y, b.z, 0.75, 0.75, 0.75, b.col, 0, 0, 0, 1.2);
+      // hitboxen styr storleken, så en stenbumling ser ut som en
+      const bs = (b.radius || 0.45) * 1.65;
+      B.sphere.push(b.x, b.y, b.z, bs, bs, bs, b.col, 0, 0, 0, b.boom ? 0.35 : 1.2);
     }
     for (const q of this.pickups) {
       const s = q.kind === 'xp' ? 0.55 : q.kind === 'gold' ? 0.5 : 0.9;

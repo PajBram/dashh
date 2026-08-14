@@ -411,7 +411,9 @@ class BossMission extends Mission {
       mgr.spawnCamp(ctx, mgr.campSpot(ctx, 48, ARENA_RADIUS - 14), mgr.plan.budget / mgr.plan.camps);
     }
     const spot = mgr.campSpot(ctx, 62, ARENA_RADIUS - 18);
-    const e = ctx.spawnEnemy('boss', spot.x, spot.z, true);
+    // äventyret har egna bossar — vågläget behåller sina
+    const type = ctx.worldId === 'city' ? 'cityboss' : 'vildboss';
+    const e = ctx.spawnEnemy(type, spot.x, spot.z, true);
     e.postGuard(38);
     this.target = e;
   }
