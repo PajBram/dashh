@@ -160,6 +160,10 @@ Fullscreen sköts av sajtens egen `static/js/fullscreen.js` — bygg ingen egen.
   `dir.xz / max(dir.y, 0.22)` måste vara klampad. Utan klampen samplas bruset
   i grus nära horisonten; utan höjdgränsen tänjs det till stora suddiga fält
   som läser som mulet väder. Båda misstagen gjordes 2026-08-17.
+- **Årstiden bor i `noise.js`** (`SEASON`), för både marken (`terrain.js`)
+  och växtligheten läser den. Världscachen i `renderer.js` nycklas på
+  `wild:<årstid>` — utan årstiden i nyckeln får man förra körningens skog
+  tillbaka. Checkpointen sparar sin årstid, så man återvänder till samma skog.
 - **Vildheims skog har fyra arter, fördelade efter höjd** (`scatterProps`):
   lövträd och björk nere vid vattnet, gran högre upp, döda stammar högst.
   Lövverket skiftar mot rost på höjden. Gör inte om den till en enda sort —

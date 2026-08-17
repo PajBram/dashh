@@ -10,7 +10,7 @@ import { AdventureManager, CHECKPOINT_EVERY } from './adventure.js';
 import { Combat } from './combat.js';
 import { rollChoices, recalc } from './upgrades.js';
 import { WARES, REPAIR, priceOf, repairPrice } from './shop.js';
-import { terrainHeight, WATER_LEVEL } from './noise.js';
+import { terrainHeight, WATER_LEVEL, SEASON, randomSeasonId } from './noise.js';
 
 const DAY_LENGTH = 320;   // sekunder per dygn
 
@@ -106,7 +106,10 @@ export class Game {
     if (worldId) this.worldId = worldId;
     if (mode) this.mode = mode;
     if (checkpoint) this.worldId = checkpoint.world;
-    this.renderer.buildWorld(this.worldId);
+    // Varje körning i Vildheim får sin årstid. Checkpointen minns sin, så
+    // man återvänder till samma skog man lämnade.
+    this.season = checkpoint && checkpoint.season ? checkpoint.season : randomSeasonId();
+    this.renderer.buildWorld(this.worldId, this.season);
     this.colliders = this.renderer.props.grid;
     this.buildings = this.renderer.props.buildings || null;   // taksnipern behöver dem
     this.sound.init();
@@ -123,7 +126,7 @@ export class Game {
     } else if (this.worldId === 'city') {
       this.hud.showBanner('NEOTROPOLIS', adv ? 'head out into the city' : 'hold space — fly', 3);
     } else {
-      this.hud.showBanner('VILDHEIM', adv ? 'head out into the wild' : 'the waves are coming');
+      this.hud.showBanner('VILDHEIM', SEASON.name.toLowerCase(), 3);
     }
     this.input.enabled = true;
     if (!this.input.touch) this.input.requestLock();
@@ -349,6 +352,7 @@ export class Game {
     const p = this.player;
     this.checkpoint = {
       world: this.worldId,
+      season: this.season,
       level: this.adventure.level,
       stats: Object.assign({}, p.stats),
       hp: p.hp,

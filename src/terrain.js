@@ -1,10 +1,11 @@
 // Bygger terrängmeshen, färgar den efter höjd och lutning, och strör ut
 // träd, klippor och kristaller (som också fungerar som hinder).
-import { WORLD_SIZE, WATER_LEVEL, terrainHeight, terrainNormal, fbm,
+import { SEASON, WORLD_SIZE, WATER_LEVEL, terrainHeight, terrainNormal, fbm,
          cityBuildings, CITY_CELL } from './noise.js';
 import { clamp, lerp, smoothstep, rand, randInt, TAU } from './math.js';
 
 const SAND = [0.62, 0.55, 0.36];
+// Gräsets färg kommer från årstiden (noise.js) — de här är sommarens.
 const GRASS = [0.20, 0.40, 0.20];
 const GRASS2 = [0.28, 0.47, 0.24];
 const ROCK = [0.34, 0.33, 0.37];
@@ -72,7 +73,7 @@ export function buildTerrainMesh(res = 200) {
 
       const slope = clamp(1 - nrm.y, 0, 1);
       const variation = fbm(x * 0.09, z * 0.09, 2) * 0.5 + 0.5;
-      mix3(GRASS, GRASS2, variation, tmp);
+      mix3(SEASON.grass, SEASON.grass2, variation, tmp);
       // sten på branta sidor
       mix3(tmp, ROCK, smoothstep(0.22, 0.55, slope), tmp);
       // strand vid vattenlinjen
@@ -80,7 +81,8 @@ export function buildTerrainMesh(res = 200) {
       // sjöbotten
       mix3(tmp, MUD, smoothstep(0.0, -2.5, h - WATER_LEVEL), tmp);
       // snö på topparna
-      mix3(tmp, SNOW, smoothstep(30, 46, h) * (1 - smoothstep(0.55, 0.8, slope)), tmp);
+      const snowLine = SEASON.snow > 0 ? 1.5 : 30;
+      mix3(tmp, SNOW, smoothstep(snowLine, snowLine + 16, h) * (1 - smoothstep(0.55, 0.8, slope)), tmp);
       // lite kornighet
       const g = 0.94 + variation * 0.12;
       colors[idx] = tmp[0] * g; colors[idx + 1] = tmp[1] * g; colors[idx + 2] = tmp[2] * g;
@@ -192,6 +194,8 @@ export function scatterProps() {
     else if (alt < 0.68) kind = r < 0.62 ? 'pine' : r < 0.88 ? 'broadleaf' : 'birch';
     else kind = r < 0.78 ? 'pine' : 'dead';
 
+    // Höst och vinter fäller löven på lövträden — granen står grön året om.
+    if (kind !== 'pine' && kind !== 'dead' && Math.random() < SEASON.bare) kind = 'dead';
     const scale = rand(0.8, 1.5) * (kind === 'broadleaf' ? 1.1 : 1);
     const hue = rand(0.6, 1.0);
     const trunk = kind === 'birch'
@@ -201,13 +205,14 @@ export function scatterProps() {
         : [0.24 * hue, 0.16 * hue, 0.11 * hue];
     // lövverket skiftar mot gult och rost på höjden, som en höstsida
     const warm = alt * 0.5 + rand(0, 0.3);
+    const seasonLeaf = (c) => [c[0] * SEASON.leaf[0], c[1] * SEASON.leaf[1], c[2] * SEASON.leaf[2]];
     trees.push({
       x, y: h, z, kind, scale, rot: rand(TAU), trunk,
-      leaf: kind === 'broadleaf'
+      leaf: seasonLeaf(kind === 'broadleaf'
         ? [lerp(0.18, 0.52, warm), lerp(0.42, 0.50, hue), lerp(0.12, 0.16, Math.random())]
         : kind === 'birch'
           ? [lerp(0.35, 0.62, warm), lerp(0.60, 0.68, hue), 0.22]
-          : [lerp(0.10, 0.24, Math.random()), lerp(0.30, 0.52, hue), lerp(0.14, 0.26, Math.random())],
+          : [lerp(0.10, 0.24, Math.random()), lerp(0.30, 0.52, hue), lerp(0.14, 0.26, Math.random())]),
       tiers: randInt(2, 3),
       lean: rand(-0.09, 0.09),
     });
@@ -254,7 +259,7 @@ export function scatterProps() {
 
   place(900, (x, z, h, slope) => {
     if (h < WATER_LEVEL + 0.6 || h > 30 || slope > 0.3) return;
-    grassTufts.push({ x, y: h, z, scale: rand(0.35, 0.85), rot: rand(TAU) });
+    grassTufts.push({ x, y: h, z, scale: rand(0.35, 0.85) * (SEASON.snow ? 0.6 : 1), rot: rand(TAU) });
   });
 
   // Blommor växer i ängar, inte jämnt utspridda: ett lågfrekvent brus
@@ -265,6 +270,7 @@ export function scatterProps() {
   ];
   place(1400, (x, z, h, slope) => {
     if (h < WATER_LEVEL + 0.7 || h > 26 || slope > 0.24) return;
+    if (Math.random() > SEASON.flowers) return;   // vår blommar över, vinter knappt alls
     const meadow = fbm(x * 0.035 + 8.1, z * 0.035 - 3.7, 2);
     if (meadow < 0.12) return;
     flowers.push({

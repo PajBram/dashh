@@ -39,6 +39,46 @@ export const WORLD_SIZE = 300;     // terrängmeshens sida
 export let WORLD_ID = 'wild';      // 'wild' = Vildheim, 'city' = Neotropolis
 export function setWorld(id) { WORLD_ID = id; }
 
+// ------------------------------------------------------------- årstiden
+//
+// Vildheim har fyra årstider som slumpas när en körning börjar. Årstiden
+// styr både markens färg (terrängmeshen) och växtligheten (utplaceringen),
+// så den måste bo här där båda kommer åt den. Byter man årstid måste
+// världen byggas om — se `Renderer.buildWorld`.
+
+export const SEASONS = {
+  spring: {
+    name: 'Spring', grass: [0.24, 0.46, 0.20], grass2: [0.35, 0.56, 0.26],
+    leaf: [1.05, 1.08, 0.95], flowers: 1.7, snow: 0, bare: 0,
+    // ljusa, nyutslagna löv och marken full av blom
+  },
+  summer: {
+    name: 'Summer', grass: [0.20, 0.40, 0.20], grass2: [0.28, 0.47, 0.24],
+    leaf: [0.95, 1.0, 0.9], flowers: 1.0, snow: 0, bare: 0,
+  },
+  autumn: {
+    name: 'Autumn', grass: [0.38, 0.36, 0.18], grass2: [0.46, 0.41, 0.21],
+    leaf: [1.5, 0.85, 0.45], flowers: 0.45, snow: 0, bare: 0.25,
+    // lövverket går i rost och en fjärdedel av träden har fällt bladen
+  },
+  winter: {
+    name: 'Winter', grass: [0.62, 0.68, 0.72], grass2: [0.72, 0.77, 0.82],
+    leaf: [0.7, 0.78, 0.85], flowers: 0.05, snow: 1, bare: 0.6,
+  },
+};
+
+export let SEASON = SEASONS.summer;
+export let SEASON_ID = 'summer';
+export function setSeason(id) {
+  if (!SEASONS[id]) return;
+  SEASON_ID = id;
+  SEASON = SEASONS[id];
+}
+export function randomSeasonId() {
+  const keys = Object.keys(SEASONS);
+  return keys[Math.floor(Math.random() * keys.length)];
+}
+
 // ------------------------------------------------------- Neotropolis (stad)
 
 export const CITY_CELL = 26;       // kvartersstorlek — gator ligger på cellgränserna

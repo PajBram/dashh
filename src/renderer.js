@@ -5,7 +5,7 @@ import { TERRAIN_VS, TERRAIN_FS, INST_VS, INST_FS, SHADOW_VS, SHADOW_FS,
          PART_VS, PART_FS, SKY_VS, SKY_FS, WATER_VS, WATER_FS } from './shaders.js';
 import { sphere, box, cone, cylinder, disc, octahedron, grid } from './meshes.js';
 import { buildTerrainMesh, buildCityGroundMesh, scatterProps, cityProps } from './terrain.js';
-import { WORLD_SIZE, WATER_LEVEL, CITY_CELL, setWorld } from './noise.js';
+import { WORLD_SIZE, WATER_LEVEL, CITY_CELL, SEASON_ID, setWorld, setSeason } from './noise.js';
 
 // ------------------------------------------------------------- partikelsystem
 
@@ -199,13 +199,19 @@ export class Renderer {
     this.resize();
   }
 
-  /** Väljer aktiv värld; geometrin byggs första gången och cachas sedan. */
-  buildWorld(id) {
+  /**
+   * Väljer aktiv värld och årstid; geometrin byggs första gången och cachas.
+   * Cachenyckeln innehåller årstiden — samma karta i höstfärger är en annan
+   * mesh, och utan det i nyckeln får man förra körningens sommar tillbaka.
+   */
+  buildWorld(id, season) {
     setWorld(id);
-    if (!this.worldCache[id]) {
-      this.worldCache[id] = id === 'city' ? this.buildCityWorld() : this.buildWildWorld();
+    if (season) setSeason(season);
+    const key = id === 'city' ? 'city' : `wild:${SEASON_ID}`;
+    if (!this.worldCache[key]) {
+      this.worldCache[key] = id === 'city' ? this.buildCityWorld() : this.buildWildWorld();
     }
-    const w = this.worldCache[id];
+    const w = this.worldCache[key];
     this.terrain = w.terrain;
     this.static = w.static;
     this.props = w.props;
