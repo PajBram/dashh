@@ -86,7 +86,7 @@ export function uploadMesh(gl, m) {
 }
 
 // Per instans: pos(3) skala(3) färg(3) rotation(3) glöd(1) = 13 flyttal.
-export const INST_FLOATS = 13;
+export const INST_FLOATS = 14;   // 14:e = vindkänslighet, se INST_VS
 
 export class InstancedBatch {
   constructor(gl, m, capacity = 256) {
@@ -120,6 +120,7 @@ export class InstancedBatch {
     attrib(gl, 4, 3, st, 24, 1);
     attrib(gl, 5, 3, st, 36, 1);
     attrib(gl, 6, 1, st, 48, 1);
+    attrib(gl, 7, 1, st, 52, 1);
     gl.bindVertexArray(null);
   }
 
@@ -135,8 +136,11 @@ export class InstancedBatch {
     gl.bufferData(gl.ARRAY_BUFFER, next.byteLength, gl.DYNAMIC_DRAW);
   }
 
-  /** rot är [x,y,z] i radianer; glow 0..1 lägger till egenljus. */
-  push(x, y, z, sx, sy, sz, col, rx = 0, ry = 0, rz = 0, glow = 0) {
+  /**
+   * rot är [x,y,z] i radianer; glow 0..1 lägger till egenljus.
+   * sway > 0 låter vinden böja objektet — 0 för allt som ska stå stilla.
+   */
+  push(x, y, z, sx, sy, sz, col, rx = 0, ry = 0, rz = 0, glow = 0, sway = 0) {
     if (this.count >= this.capacity) this.grow();
     const d = this.data;
     let o = this.count * INST_FLOATS;
@@ -145,6 +149,7 @@ export class InstancedBatch {
     d[o + 6] = col[0]; d[o + 7] = col[1]; d[o + 8] = col[2];
     d[o + 9] = rx; d[o + 10] = ry; d[o + 11] = rz;
     d[o + 12] = glow;
+    d[o + 13] = sway;
     this.count++;
     this.dirty = true;
   }

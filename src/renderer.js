@@ -96,6 +96,8 @@ export function computeEnv(dayTime, worldId = 'wild') {
       // Diset ligger på gatunivå och tunnas ut mot tornens toppar.
       fogHeight: 0.013,
       clouds: 0,
+      // stadens vind kanaliseras mellan husen och är svag på gatunivå
+      wind: [0.35, 0.15],
     };
   }
   const a = (dayTime - 0.25) * TAU;
@@ -143,6 +145,9 @@ export function computeEnv(dayTime, worldId = 'wild') {
     fogHeight: 0.009,
     // Molnen tunnas ut på natten, då man ändå bara ser stjärnor genom dem.
     clouds: lerp(0.35, 1.0, dayT),
+    // Vinden vrider sig långsamt över dygnet och friskar i på eftermiddagen.
+    wind: [Math.cos(dayTime * TAU * 0.6) * (0.75 + dayT * 0.5),
+           Math.sin(dayTime * TAU * 0.6) * (0.75 + dayT * 0.5)],
   };
 }
 
@@ -396,12 +401,12 @@ export class Renderer {
         const h = 2.6 * s;
         trunks.push(t.x, t.y + h * 0.5, t.z, 0.62 * s, h, 0.62 * s, t.trunk, lean, t.rot, 0, 0);
         const cy = t.y + h + 1.5 * s;
-        canopy.push(t.x, cy, t.z, 3.2 * s, 2.6 * s, 3.2 * s, t.leaf, 0, t.rot, 0, 0);
+        canopy.push(t.x, cy, t.z, 3.2 * s, 2.6 * s, 3.2 * s, t.leaf, 0, t.rot, 0, 0, 0.42 * s);
         for (let i = 0; i < 2; i++) {
           const a = t.rot + i * 2.4;
           canopy.push(t.x + Math.cos(a) * 1.5 * s, cy - 0.5 * s, t.z + Math.sin(a) * 1.5 * s,
             2.1 * s, 1.8 * s, 2.1 * s,
-            [t.leaf[0] * 0.88, t.leaf[1] * 0.92, t.leaf[2]], 0, a, 0, 0);
+            [t.leaf[0] * 0.88, t.leaf[1] * 0.92, t.leaf[2]], 0, a, 0, 0, 0.38 * s);
         }
       } else if (t.kind === 'birch') {
         // björk: smal ljus stam, gles krona, mörka streck på nävern
@@ -411,9 +416,9 @@ export class Renderer {
           rocks.push(t.x, t.y + h * (0.3 + i * 0.22), t.z, 0.34 * s, 0.09 * s, 0.34 * s,
             [0.20, 0.19, 0.18], 0, t.rot + i, 0, 0);
         }
-        canopy.push(t.x, t.y + h + 0.9 * s, t.z, 2.3 * s, 2.0 * s, 2.3 * s, t.leaf, 0, t.rot, 0, 0);
+        canopy.push(t.x, t.y + h + 0.9 * s, t.z, 2.3 * s, 2.0 * s, 2.3 * s, t.leaf, 0, t.rot, 0, 0, 0.5 * s);
         canopy.push(t.x, t.y + h + 1.9 * s, t.z, 1.5 * s, 1.4 * s, 1.5 * s,
-          [t.leaf[0] * 1.05, t.leaf[1] * 1.02, t.leaf[2]], 0, -t.rot, 0, 0);
+          [t.leaf[0] * 1.05, t.leaf[1] * 1.02, t.leaf[2]], 0, -t.rot, 0, 0, 0.55 * s);
       } else if (t.kind === 'dead') {
         // dött träd: bar stam med ett par knotiga grenar
         const h = 3.8 * s;
@@ -431,15 +436,16 @@ export class Renderer {
           const f = i / t.tiers;
           const r = (3.4 - f * 1.5) * s;
           leaves.push(t.x, t.y + h * (0.75 + f * 0.72), t.z, r, 3.0 * s, r,
-            [t.leaf[0] * (1 - f * 0.12), t.leaf[1] * (1 - f * 0.1), t.leaf[2]], 0, t.rot + f, 0, 0);
+            [t.leaf[0] * (1 - f * 0.12), t.leaf[1] * (1 - f * 0.1), t.leaf[2]], 0, t.rot + f, 0, 0,
+            0.28 * s * (0.5 + f));
         }
       }
     }
     for (const b of props.bushes) {
       const s = b.scale;
-      canopy.push(b.x, b.y + 0.5 * s, b.z, 1.5 * s, 1.1 * s, 1.5 * s, b.col, 0, b.rot, 0, 0);
+      canopy.push(b.x, b.y + 0.5 * s, b.z, 1.5 * s, 1.1 * s, 1.5 * s, b.col, 0, b.rot, 0, 0, 0.2 * s);
       canopy.push(b.x + 0.5 * s, b.y + 0.35 * s, b.z - 0.4 * s, 1.0 * s, 0.8 * s, 1.0 * s,
-        [b.col[0] * 0.85, b.col[1] * 0.9, b.col[2]], 0, -b.rot, 0, 0);
+        [b.col[0] * 0.85, b.col[1] * 0.9, b.col[2]], 0, -b.rot, 0, 0, 0.2 * s);
       if (b.berries) {
         for (let i = 0; i < 3; i++) {
           const a = b.rot + i * 2.1;
@@ -459,15 +465,15 @@ export class Renderer {
     }
     for (const f of props.flowers) {
       const s = f.scale;
-      tufts.push(f.x, f.y + 0.22 * s, f.z, 0.10 * s, 0.5 * s, 0.10 * s, [0.22, 0.40, 0.16], 0, f.rot, 0, 0);
-      petals.push(f.x, f.y + 0.50 * s, f.z, 0.32 * s, 0.24 * s, 0.32 * s, f.col, 0, f.rot, 0, 0.28);
+      tufts.push(f.x, f.y + 0.22 * s, f.z, 0.10 * s, 0.5 * s, 0.10 * s, [0.22, 0.40, 0.16], 0, f.rot, 0, 0, 0.2 * s);
+      petals.push(f.x, f.y + 0.50 * s, f.z, 0.32 * s, 0.24 * s, 0.32 * s, f.col, 0, f.rot, 0, 0.28, 0.24 * s);
     }
     for (const r of props.reeds) {
       const s = r.scale;
       for (let i = 0; i < 3; i++) {
         const a = r.rot + i * 2.1;
         tufts.push(r.x + Math.cos(a) * 0.18, r.y + 0.7 * s, r.z + Math.sin(a) * 0.18,
-          0.07, 1.5 * s, 0.07, [0.35, 0.42, 0.20], 0.08, a, 0, 0);
+          0.07, 1.5 * s, 0.07, [0.35, 0.42, 0.20], 0.08, a, 0, 0, 0.5 * s);
       }
     }
     for (const r of props.rocks) {
@@ -479,7 +485,7 @@ export class Renderer {
     }
     for (const g of props.grassTufts) {
       tufts.push(g.x, g.y + 0.22 * g.scale, g.z, 0.5 * g.scale, 0.9 * g.scale, 0.5 * g.scale,
-        [0.20, 0.36, 0.16], 0, g.rot, 0, 0);
+        [0.20, 0.36, 0.16], 0, g.rot, 0, 0, 0.22 * g.scale);
     }
     return {
       terrain: uploadMesh(gl, buildTerrainMesh(200)),
@@ -592,6 +598,7 @@ export class Renderer {
     this.drawTaxis(time);
     this.pInst.use();
     this.applyEnv(this.pInst, env, cam.pos);
+    this.pInst.f('uTime', time).v2('uWind', env.wind[0], env.wind[1]);
     for (const b of this.static) b.draw();
     for (const k in this.dyn) this.dyn[k].draw();
 

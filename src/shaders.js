@@ -109,12 +109,31 @@ layout(location=3) in vec3 iScale;
 layout(location=4) in vec3 iCol;
 layout(location=5) in vec3 iRot;
 layout(location=6) in float iGlow;
+layout(location=7) in float iSway;
 uniform mat4 uVP;
+uniform float uTime;
+uniform vec2 uWind;           // riktning × styrka
 ${ROT}
 out vec3 vN; out vec3 vC; out vec3 vW; out float vGlow;
 void main(){
   mat3 R = rotMat(iRot);
   vec3 world = R * (aPos * iScale) + iPos;
+
+  /* Vind: böjningen växer med höjden över objektets fot, så stammen står
+     stilla medan kronan vaggar. Fasen kommer ur objektets världsläge, så
+     varje träd och grässtrå rör sig i sin egen takt i stället för att hela
+     skogen svaja som en enda kropp. Byar rullar genom landskapet via en
+     långsam våg i samma led som vinden blåser. */
+  if (iSway > 0.0) {
+    // t: 0 vid objektets fot, 1 vid dess topp — foten står stilla
+    float t = clamp((world.y - iPos.y) / max(iScale.y, 0.001) + 0.5, 0.0, 1.0);
+    float phase = iPos.x * 0.35 + iPos.z * 0.27;
+    float gust = 0.65 + 0.35 * sin(uTime * 0.5 + (iPos.x + iPos.z) * 0.04);
+    float bend = sin(uTime * 1.7 + phase) * 0.5 + sin(uTime * 2.9 + phase * 1.7) * 0.22;
+    // iSway är utslaget i meter vid full vind
+    world.xz += uWind * (iSway * t * gust * (0.55 + bend));
+  }
+
   vN = normalize(R * (aNrm / max(abs(iScale), vec3(0.0005))));
   vC = iCol; vW = world; vGlow = iGlow;
   gl_Position = uVP * vec4(world, 1.0);
