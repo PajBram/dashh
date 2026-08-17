@@ -187,6 +187,18 @@ export class Sound {
     this.tone({ f: 105, f2: 60, dur: 1.6, type: 'square', vol: 0.10, delay: 0.1 });
     this.noise({ dur: 1.4, vol: 0.12, freq: 260, sweep: 60, q: 0.4 });
   }
+  /** Åska. far 0 = strax intill och skarpt, 1 = långt bort och dovt. */
+  thunder(far = 0.5) {
+    const delay = far * 2.6;            // ljudet hinner ifatt ljuset
+    const vol = 0.26 * (1 - far * 0.6);
+    this.noise({ dur: 0.9 + far * 1.4, vol, freq: 190 - far * 110, q: 0.35,
+      sweep: 55, delay });
+    this.noise({ dur: 1.6 + far * 1.8, vol: vol * 0.7, freq: 95 - far * 45, q: 0.3,
+      delay: delay + 0.18 });
+    this.tone({ f: 44, f2: 26, dur: 1.5 + far, type: 'sine', vol: vol * 0.5, delay: delay + 0.05 });
+    if (far < 0.5) this.noise({ dur: 0.12, vol: vol * 0.9, freq: 2600, q: 0.9, delay });
+  }
+
   gameOver() {
     [392, 330, 262, 196].forEach((f, i) =>
       this.tone({ f, f2: f * 0.5, dur: 0.7, type: 'triangle', vol: 0.14, delay: i * 0.22 }));

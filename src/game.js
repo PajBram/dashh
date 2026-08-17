@@ -92,6 +92,12 @@ export class Game {
     this.ambientTimer = 0;
     this.hitstop = 0;
     this.interludeT = 0;
+    // vädret: 0 = uppehåll, 1 = ösregn. Byggs upp och avtar långsamt.
+    this.rain = 0;
+    this.rainTarget = 0;
+    this.weatherTimer = rand(40, 100);
+    this.lightning = 0;
+    this.thunderTimer = 0;
     this.hud.clearFloaters();
     this.hud.setBoss(null);
   }
@@ -262,6 +268,58 @@ export class Game {
       this.pendingLevelUps++;
     }
     if (this.pendingLevelUps > 0 && this.state === 'playing') this.openLevelUp();
+  }
+
+  /**
+   * Vädret i Vildheim. Regnet kommer och går av sig självt, byggs upp över
+   * en halv minut och avtar lika långsamt — inget slås på och av. Under
+   * ösregn slår blixtar ner, och åskan hörs efter en fördröjning som beror
+   * på hur långt bort nedslaget var, som i verkligheten.
+   *
+   * Neotropolis regnar inte: det är en inomhusnatt av neon, och regn där
+   * skulle bara skymma sikten i en värld där man redan flyger blint.
+   */
+  updateWeather(dt) {
+    if (this.worldId === 'city') { this.rain = 0; this.lightning = 0; return; }
+
+    this.weatherTimer -= dt;
+    if (this.weatherTimer <= 0) {
+      // ungefär var tredje väderomslag blir regn, resten uppehåll
+      this.rainTarget = Math.random() < 0.35 ? rand(0.45, 1) : 0;
+      this.weatherTimer = this.rainTarget > 0 ? rand(50, 110) : rand(70, 160);
+      if (this.rainTarget > 0.8) this.toast('The sky is darkening');
+    }
+    this.rain += clamp(this.rainTarget - this.rain, -dt * 0.06, dt * 0.045);
+
+    this.lightning = Math.max(0, this.lightning - dt * 3.2);
+    if (this.rain > 0.75) {
+      this.thunderTimer -= dt;
+      if (this.thunderTimer <= 0) {
+        this.thunderTimer = rand(6, 22);
+        this.lightning = 1;
+        // avståndet styr både ljusstyrkan och hur länge det dröjer till dånet
+        const far = rand(0.2, 1);
+        this.sound.thunder(far);
+        this.player.shake = Math.min(1.2, this.player.shake + (1 - far) * 0.5);
+      }
+    }
+
+    // regndroppar: streck som faller runt spelaren och tar slut vid marken
+    if (this.rain > 0.05) {
+      const p = this.player.pos;
+      const drops = Math.round(this.rain * 26);
+      for (let i = 0; i < drops; i++) {
+        const a = rand(TAU), d = Math.sqrt(Math.random()) * 26;
+        const x = p.x + Math.cos(a) * d, z = p.z + Math.sin(a) * d;
+        const gh = Math.max(terrainHeight(x, z), WATER_LEVEL);
+        this.particles.spawn({
+          x, y: gh + rand(6, 17), z,
+          vx: rand(-1, 1), vy: -rand(26, 36), vz: rand(-1, 1),
+          life: rand(0.35, 0.6), size: rand(0.06, 0.13), size2: 0.03,
+          col: [0.62, 0.78, 0.95], alpha: 0.5, drag: 0,
+        });
+      }
+    }
   }
 
   addGold(n) {
@@ -529,6 +587,8 @@ export class Game {
     this.combat.update(dt, this);
     this.particles.update(dt);
 
+    this.updateWeather(dt);
+
     /*
      * Luften ska aldrig vara tom. Vad som svävar i den beror på var och när:
      * pollen som driver i solen, eldflugor som blinkar i skymningen, och
@@ -583,12 +643,44 @@ export class Game {
     const r = this.renderer;
     const p = this.player;
     this.env = computeEnv(this.dayTime, this.worldId);
+    if (this.rain > 0.02) this.applyRainToEnv(this.env);
     r.clearBatches();
     if (p.alive) p.draw(r, this.time);
     for (const e of this.enemies) e.draw(r, this.time);
     this.combat.draw(r, this.time);
     if (this.mode === 'adventure') this.adventure.draw(r, this.time);
     r.render(p.camera(this.time), this.env, this.time, p.pos);
+  }
+
+  /**
+   * Regnet dränker färgen ur landskapet: solen dämpas, dimman kryper
+   * närmare och allt gråas ner. Blixten gör tvärtom under ett ögonblick —
+   * hela världen blir vit och skuggorna försvinner.
+   */
+  applyRainToEnv(env) {
+    const w = this.rain;
+    const grey = (c, t) => {
+      const l = (c[0] + c[1] + c[2]) / 3;
+      return [lerp(c[0], l * 0.82, t), lerp(c[1], l * 0.84, t), lerp(c[2], l * 0.95, t)];
+    };
+    env.sunCol = [env.sunCol[0] * (1 - w * 0.55), env.sunCol[1] * (1 - w * 0.55), env.sunCol[2] * (1 - w * 0.5)];
+    env.fogCol = grey(env.fogCol, w * 0.8);
+    env.skyTop = grey(env.skyTop, w * 0.75);
+    env.skyHor = grey(env.skyHor, w * 0.75);
+    env.amb = [env.amb[0] * (1 - w * 0.2), env.amb[1] * (1 - w * 0.18), env.amb[2] * (1 - w * 0.1)];
+    env.fogNear = lerp(env.fogNear, 16, w);
+    env.fogFar = lerp(env.fogFar, 92, w);
+    env.clouds = Math.min(1, env.clouds + w * 0.6);
+    env.wind = [env.wind[0] * (1 + w), env.wind[1] * (1 + w)];
+
+    const f = this.lightning;
+    if (f > 0) {
+      const flash = f * f;
+      env.amb = [env.amb[0] + flash * 1.5, env.amb[1] + flash * 1.6, env.amb[2] + flash * 1.9];
+      env.fogCol = [env.fogCol[0] + flash * 0.5, env.fogCol[1] + flash * 0.52, env.fogCol[2] + flash * 0.6];
+      env.skyTop = [env.skyTop[0] + flash * 0.7, env.skyTop[1] + flash * 0.75, env.skyTop[2] + flash * 0.9];
+      env.skyHor = [env.skyHor[0] + flash * 0.7, env.skyHor[1] + flash * 0.75, env.skyHor[2] + flash * 0.9];
+    }
   }
 
   // -------------------------------------------------------------------- loop
