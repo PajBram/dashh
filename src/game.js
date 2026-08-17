@@ -529,22 +529,49 @@ export class Game {
     this.combat.update(dt, this);
     this.particles.update(dt);
 
-    // stämningspartiklar: gnistor på dagen, glödmott på natten
+    /*
+     * Luften ska aldrig vara tom. Vad som svävar i den beror på var och när:
+     * pollen som driver i solen, eldflugor som blinkar i skymningen, och
+     * asklika flagor i stadens eviga natt. De föds runt spelaren och lever
+     * några sekunder — inget behöver hållas reda på.
+     */
     this.ambientTimer -= dt;
     if (this.ambientTimer <= 0) {
-      this.ambientTimer = 0.06;
       const env = this.env || computeEnv(this.dayTime, this.worldId);
       const night = env.night;
+      const city = this.worldId === 'city';
+      this.ambientTimer = city ? 0.09 : night > 0.45 ? 0.14 : 0.05;
       const a = rand(TAU), d = rand(6, 34);
       const x = p.pos.x + Math.cos(a) * d, z = p.pos.z + Math.sin(a) * d;
       const gh = terrainHeight(x, z);
-      this.particles.spawn({
-        x, y: Math.max(gh, WATER_LEVEL) + rand(0.4, 5), z,
-        vx: rand(-0.4, 0.4), vy: rand(0.1, 0.7), vz: rand(-0.4, 0.4),
-        life: rand(1.6, 3.4), size: rand(0.10, 0.24), size2: 0,
-        col: night > 0.4 ? [0.45, 0.95, 0.8] : [1.0, 0.95, 0.75],
-        alpha: night > 0.4 ? 0.75 : 0.3, drag: 0.05,
-      });
+      const base = Math.max(gh, WATER_LEVEL);
+
+      if (city) {
+        // stoft och glödflagor som stiger mellan husen
+        this.particles.spawn({
+          x, y: base + rand(0.5, 14), z,
+          vx: rand(-0.5, 0.5), vy: rand(0.4, 1.6), vz: rand(-0.5, 0.5),
+          life: rand(2.4, 5.0), size: rand(0.07, 0.17), size2: 0,
+          col: Math.random() < 0.3 ? [1.0, 0.45, 0.65] : [0.45, 0.85, 1.0],
+          alpha: 0.5, drag: 0.06,
+        });
+      } else if (night > 0.45) {
+        // eldflugor: få, långsamma, låga över marken och gulgröna
+        this.particles.spawn({
+          x, y: base + rand(0.3, 2.6), z,
+          vx: rand(-0.35, 0.35), vy: rand(-0.15, 0.35), vz: rand(-0.35, 0.35),
+          life: rand(2.6, 5.2), size: rand(0.13, 0.26), size2: 0.02,
+          col: [0.75, 1.0, 0.35], alpha: 0.9, drag: 0.9,
+        });
+      } else {
+        // pollen: mängder av små ljusa flagor som dalar sakta i dagsljuset
+        this.particles.spawn({
+          x, y: base + rand(0.4, 6.5), z,
+          vx: rand(-0.5, 0.5), vy: rand(-0.25, 0.12), vz: rand(-0.5, 0.5),
+          life: rand(3.0, 6.0), size: rand(0.06, 0.15), size2: 0,
+          col: [1.0, 0.97, 0.80], alpha: 0.34, drag: 0.03,
+        });
+      }
     }
 
     if (!p.alive && this.state === 'playing') this.die();

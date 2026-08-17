@@ -503,9 +503,30 @@ export class Renderer {
     this.shadows.clear();
   }
 
-  /** Skuggfläck på marken. */
+  /**
+   * Skuggfläck på marken, kastad bort från ljuset.
+   *
+   * Solen står stilla i sin bana under dygnet, och skuggan följer med: mitt
+   * på dagen ligger den som en liten fläck under fötterna, mot kvällen dras
+   * den ut och lägger sig långt åt sidan. Höjden över marken sträcker den
+   * ytterligare, så ett hopp syns på marken innan man landar.
+   */
   shadow(x, y, z, radius, alpha) {
-    this.shadows.push(x, y + 0.06, z, radius * 2, 1, radius * 2, [0, 0, 0], 0, 0, 0, alpha);
+    const s = this.sun || { x: 0, y: 1, z: 0 };
+    // hur lågt ljuset står: 0 = rakt uppifrån, 1 = vid horisonten
+    const low = clamp(1 - Math.max(s.y, 0.05), 0, 1);
+    const lateral = Math.hypot(s.x, s.z) || 1e-4;
+    // skuggan skjuts undan i ljusets riktning
+    const reach = radius * 0.9 * low / Math.max(s.y, 0.18);
+    const ox = -(s.x / lateral) * Math.min(reach, radius * 6);
+    const oz = -(s.z / lateral) * Math.min(reach, radius * 6);
+    // och tänjs ut längs samma riktning i stället för att förbli en cirkel
+    const stretch = 1 + low * 1.6;
+    const yaw = Math.atan2(-s.x, -s.z);
+    this.shadows.push(x + ox, y + 0.06, z + oz,
+      radius * 2, 1, radius * 2 * stretch, [0, 0, 0], 0, yaw, 0,
+      // låg sol ger längre men blekare skugga, som i verkligheten
+      alpha * (1 - low * 0.45));
   }
 
   applyEnv(p, env, eye) {
@@ -523,6 +544,7 @@ export class Renderer {
 
   render(cam, env, time, player) {
     const gl = this.gl;
+    this.sun = env.sunDir;   // skuggorna kastas bort från den
     this.resize();
     gl.viewport(0, 0, this.width, this.height);
 
@@ -593,6 +615,8 @@ export class Renderer {
         .v3('uFogCol', env.fogCol)
         .v2('uFog', env.fogNear, env.fogFar)
         .f('uTime', time)
+        .v3('uSkyTop', env.skyTop)
+        .v3('uSkyHor', env.skyHor)
         .f('uSize', WORLD_SIZE)
         .f('uLevel', WATER_LEVEL);
       this.waterMesh.draw();

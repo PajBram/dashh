@@ -154,7 +154,10 @@ layout(location=6) in float iGlow;
 uniform mat4 uVP;
 out float vAlpha; out vec2 vLocal;
 void main(){
-  vec3 world = aPos * iScale + iPos;
+  // bara vridning kring Y — skuggan ligger platt på marken ändå
+  float c = cos(iRot.y), s = sin(iRot.y);
+  vec3 p = aPos * iScale;
+  vec3 world = vec3(c * p.x + s * p.z, p.y, -s * p.x + c * p.z) + iPos;
   vAlpha = iGlow;
   vLocal = aPos.xz * 2.0;
   gl_Position = uVP * vec4(world, 1.0);
@@ -308,12 +311,19 @@ uniform float uLevel;
 out vec3 vW; out vec3 vN;
 void main(){
   vec3 p = vec3(aPos.x * uSize, uLevel, aPos.z * uSize);
+  // tre långa dyningar plus två korta krusningar tvärs över dem
   float a = sin(p.x * 0.25 + uTime * 1.3) * 0.10;
   float b = sin(p.z * 0.31 - uTime * 1.1) * 0.09;
   float c = sin((p.x + p.z) * 0.13 + uTime * 0.7) * 0.07;
-  p.y += a + b + c;
-  float dx = cos(p.x * 0.25 + uTime * 1.3) * 0.025 + cos((p.x + p.z) * 0.13 + uTime * 0.7) * 0.009;
-  float dz = cos(p.z * 0.31 - uTime * 1.1) * 0.028 + cos((p.x + p.z) * 0.13 + uTime * 0.7) * 0.009;
+  float d = sin(p.x * 0.85 - p.z * 0.62 + uTime * 2.1) * 0.030;
+  float e = sin(p.x * 1.31 + p.z * 1.05 - uTime * 2.7) * 0.022;
+  p.y += a + b + c + d + e;
+  float dx = cos(p.x * 0.25 + uTime * 1.3) * 0.025 + cos((p.x + p.z) * 0.13 + uTime * 0.7) * 0.009
+           + cos(p.x * 0.85 - p.z * 0.62 + uTime * 2.1) * 0.026
+           + cos(p.x * 1.31 + p.z * 1.05 - uTime * 2.7) * 0.029;
+  float dz = cos(p.z * 0.31 - uTime * 1.1) * 0.028 + cos((p.x + p.z) * 0.13 + uTime * 0.7) * 0.009
+           - cos(p.x * 0.85 - p.z * 0.62 + uTime * 2.1) * 0.019
+           + cos(p.x * 1.31 + p.z * 1.05 - uTime * 2.7) * 0.023;
   vN = normalize(vec3(-dx, 1.0, -dz));
   vW = p;
   gl_Position = uVP * vec4(p, 1.0);
@@ -326,19 +336,31 @@ uniform vec3 uEye;
 uniform vec3 uSunDir;
 uniform vec3 uSunCol;
 uniform vec3 uAmb;
+uniform vec3 uSkyTop;
+uniform vec3 uSkyHor;
 ${FOG}
 out vec4 frag;
 void main(){
   vec3 n = normalize(vN);
   vec3 view = normalize(uEye - vW);
   float fres = pow(1.0 - max(dot(n, view), 0.0), 3.0);
+
+  // Vattnet färgas av himlen det speglar i stället för av fasta blåtoner:
+  // grått under mulet, brandgult i solnedgång, blått mitt på dagen. Det är
+  // det som får sjöarna att höra ihop med tiden på dygnet.
+  vec3 refl = mix(uSkyHor, uSkyTop, clamp(0.35 + n.y * 0.4, 0.0, 1.0));
   vec3 deep = vec3(0.02, 0.10, 0.20);
-  vec3 shallow = vec3(0.06, 0.34, 0.46);
-  vec3 col = mix(deep, shallow, fres * 0.8 + 0.2) * (uAmb + 0.6);
+  vec3 body = mix(deep, vec3(0.06, 0.34, 0.46), 0.35) * (uAmb + 0.6);
+  vec3 col = mix(body, refl, clamp(fres * 0.85 + 0.06, 0.0, 0.9));
+
+  // en smal spegelbild av solen, plus glitter från de korta krusningarna
   vec3 hv = normalize(uSunDir + view);
-  col += uSunCol * pow(max(dot(n, hv), 0.0), 190.0) * 1.6;
-  col += uSunCol * fres * 0.16;
+  float spec = max(dot(n, hv), 0.0);
+  col += uSunCol * pow(spec, 220.0) * 2.0;
+  col += uSunCol * pow(spec, 26.0) * 0.10;
+  col += uSunCol * fres * 0.14;
+
   float dist = distance(vW, uEye);
   col = applyFog(col, dist);
-  frag = vec4(col, 0.80 + fres * 0.18);
+  frag = vec4(col, 0.78 + fres * 0.20);
 }`;
