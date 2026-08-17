@@ -250,6 +250,29 @@ export class Player {
         life: rand(0.25, 0.5), size: rand(0.35, 0.75), size2: 0,
         col: [0.35, 0.95, 1.0], alpha: 0.9, drag: 0.5,
       });
+      /*
+       * Spåret: en rad efterbilder längs sträckan man just tillryggalagt,
+       * inte bara ett moln kring kroppen. De läggs ut bakåt från nuvarande
+       * läge så bandet blir obrutet även när dashen går fort — vid 40 m/s
+       * hinner man annars flera meter mellan bildrutorna och spåret blir
+       * en rad prickar.
+       */
+      const back = Math.hypot(this.vel.x, this.vel.z) * dt;
+      const steps = Math.min(5, 1 + Math.floor(back / 0.6));
+      for (let i = 0; i < steps; i++) {
+        const f = i / steps;
+        for (let k = 0; k < 2; k++) {
+          w.particles.spawn({
+            x: this.pos.x - this.dashDir.x * back * f + rand(-0.25, 0.25),
+            y: this.pos.y + 0.35 + k * 0.85 + rand(-0.15, 0.15),
+            z: this.pos.z - this.dashDir.z * back * f + rand(-0.25, 0.25),
+            vx: 0, vy: rand(0.1, 0.5), vz: 0,
+            life: rand(0.28, 0.46), size: rand(0.55, 0.95), size2: 0.05,
+            col: w.worldId === 'city' ? [1.0, 0.35, 0.62] : [0.55, 0.95, 1.0],
+            alpha: 0.55, drag: 1.4,
+          });
+        }
+      }
     }
 
     // ---- hopp / flygning / dash

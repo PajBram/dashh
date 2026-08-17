@@ -69,19 +69,35 @@ export class Combat {
       hitAny = true;
     }
 
-    // svepande partikelbåge framför krigaren
-    const n = fin ? 22 : 13;
+    /*
+     * Svepet ritas som en sammanhängande båge i två lager: en tät, ljus kärna
+     * längs eggens väg och ett glesare, mörkare sken utanför den. Tidigare låg
+     * partiklarna på ett enda avstånd och drev utåt — det blev ett moln, inte
+     * ett hugg. Nu följer de klingans radie, och varje punkt längs bågen föds
+     * en aning senare än den förra så spåret sveper i huggets riktning.
+     */
+    const n = fin ? 30 : 18;
+    const dir = p.swingSide > 0 ? 1 : -1;
     for (let i = 0; i < n; i++) {
-      const a = p.yaw + (i / (n - 1) - 0.5) * arc * 2;
-      const d = range * 0.75;
-      ctx.particles.spawn({
-        x: p.pos.x + Math.sin(a) * d, y: p.pos.y + 1.3 + (Math.random() - 0.5) * (fin ? 1.6 : 0.4),
-        z: p.pos.z + Math.cos(a) * d,
-        vx: Math.sin(a) * (fin ? 7 : 3), vy: fin ? rand(1, 4) : 0.5, vz: Math.cos(a) * (fin ? 7 : 3),
-        life: fin ? 0.34 : 0.18, size: fin ? 0.95 : 0.55, size2: 0.05,
-        col: fin ? [1.0, 0.72, 0.25] : hitAny ? [1.0, 0.8, 0.5] : [0.8, 0.85, 0.95],
-        alpha: fin ? 0.9 : 0.7, drag: 0.5,
-      });
+      const f = i / (n - 1);
+      const a = p.yaw + (f - 0.5) * arc * 2 * dir;
+      for (let layer = 0; layer < 2; layer++) {
+        const d = range * (layer ? 0.92 : 0.66);
+        const sinA = Math.sin(a), cosA = Math.cos(a);
+        ctx.particles.spawn({
+          x: p.pos.x + sinA * d + rand(-0.12, 0.12),
+          y: p.pos.y + 1.3 + (fin ? (f - 0.5) * 1.5 : (Math.random() - 0.5) * 0.35),
+          z: p.pos.z + cosA * d + rand(-0.12, 0.12),
+          // liten drift utåt, så bågen tunnas ut i stället för att bara slockna
+          vx: sinA * (fin ? 5 : 2.2), vy: fin ? rand(0.5, 2.5) : 0.4, vz: cosA * (fin ? 5 : 2.2),
+          life: (fin ? 0.34 : 0.2) * (layer ? 0.7 : 1) - f * 0.04,
+          size: (fin ? 1.0 : 0.6) * (layer ? 0.7 : 1), size2: 0.04,
+          col: fin ? [1.0, 0.78, 0.30]
+            : layer ? [0.75, 0.85, 1.0]
+              : hitAny ? [1.0, 0.9, 0.65] : [0.95, 0.98, 1.0],
+          alpha: (fin ? 0.95 : 0.8) * (layer ? 0.45 : 1), drag: 0.6,
+        });
+      }
     }
     p.shake = Math.min(0.5, p.shake + (fin ? 0.3 : hitAny ? 0.08 : 0.03));
   }
