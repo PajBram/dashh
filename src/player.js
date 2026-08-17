@@ -13,9 +13,12 @@ export function rotY(x, z, a) {
 export function defaultStats() {
   return {
     maxHp: 100,
-    speed: 9.4,
-    damage: 13,
-    fireRate: 4.2,        // skott per sekund
+    // Bas + bonus: korten lägger till bonus, `recalc` räknar ut det effektiva
+    // värdet som bas × (1 + bonus). Multiplicera aldrig de effektiva direkt —
+    // det var så spelaren blev 200 gånger starkare än fienderna.
+    speedBase: 9.4, speedBonus: 0, speed: 9.4,
+    damageBase: 13, damageBonus: 0, damage: 13,
+    fireRateBase: 4.2, fireRateBonus: 0, fireRate: 4.2,   // attacker per sekund
     projSpeed: 66,
     projSize: 0.34,
     multishot: 1,
@@ -32,8 +35,14 @@ export function defaultStats() {
     jumps: 1,
     xpMult: 1,
     drones: 0,
+    thorns: 0,            // skada tillbaka på den som slår dig
+    burn: 0,              // extra skada som ligger kvar efter en träff
+    fireballCool: 10,     // eldbollens nedkylning i sekunder
   };
 }
+
+/** Kritchansen får inte nå 100 % — då blir kritmultiplikatorn en gratisbonus. */
+export const CRIT_CAP = 0.6;
 
 export class Player {
   constructor(world) {
@@ -81,7 +90,7 @@ export class Player {
     this.swingFinisher = false;
     this.combo = -1;         // 0,1,2 — det tredje hugget är en finisher
     this.comboTimer = 0;
-    this.fireballCdMax = 10;
+    this.fireballCdMax = this.stats.fireballCool;
     this.fireballCd = 0;
   }
 
@@ -156,8 +165,12 @@ export class Player {
     return { x: dx / l, y: dy / l, z: dz / l };
   }
 
-  takeDamage(n) {
+  takeDamage(n, source, ctx) {
     if (this.invuln > 0 || !this.alive) return false;
+    // Taggar/statiskt fält: den som slår dig får smaka på det själv
+    if (this.stats.thorns > 0 && source && source.alive && ctx) {
+      source.damage(this.stats.thorns, ctx, false);
+    }
     // Rustningen dämpar med avtagande effekt: varje nivå hjälper, men
     // kurvan når aldrig noll skada hur många delar man än hittar.
     if (this.armor > 0) n /= 1 + this.armor * 0.06;
@@ -641,12 +654,31 @@ export class Player {
         0.1, 0.13, 0.1, gold, 0, time * 2, 0, 0.15);
     }
 
-    // dronare från uppgraderingen
+    // Följeslagarna från uppgraderingen: maskindrönare i staden, féer i
+    // Vildheim. Samma tjänst, helt olika varelse.
     for (let i = 0; i < this.stats.drones; i++) {
       const a = this.droneAngle + (i / this.stats.drones) * TAU;
       const dx = Math.cos(a) * 2.1, dz = Math.sin(a) * 2.1;
       const dy = y + 2.4 + Math.sin(time * 2 + i) * 0.18;
-      B.octa.push(x + dx, dy, z + dz, 0.42, 0.55, 0.42, [1.0, 0.75, 0.25], 0, a * 2, 0, 0.85);
+      if (city) {
+        B.octa.push(x + dx, dy, z + dz, 0.42, 0.55, 0.42, [1.0, 0.75, 0.25], 0, a * 2, 0, 0.85);
+      } else {
+        // fé: en glödande kärna med två fladdrande vingar och ett stoftspår
+        const flap = Math.sin(time * 18 + i * 2) * 0.5;
+        B.sphere.push(x + dx, dy, z + dz, 0.22, 0.26, 0.22, [1.0, 0.88, 0.45], 0, 0, 0, 1.0);
+        for (const s of [-1, 1]) {
+          B.octa.push(x + dx, dy + 0.22, z + dz, 0.07, 0.34, 0.20,
+            [0.55, 1.0, 0.85], 0, a * 2, s * (0.7 + flap), 0.6);
+        }
+        if (Math.random() < 0.5) {
+          rend.particles.spawn({
+            x: x + dx, y: dy - 0.1, z: z + dz,
+            vx: rand(-0.3, 0.3), vy: rand(-0.8, -0.2), vz: rand(-0.3, 0.3),
+            life: rand(0.3, 0.7), size: rand(0.08, 0.18), size2: 0,
+            col: [0.75, 1.0, 0.8], alpha: 0.8, drag: 0.3,
+          });
+        }
+      }
     }
 
     rend.shadow(x, terrainHeight(x, z), z, 1.0 + (this.pos.y - terrainHeight(x, z)) * 0.05,

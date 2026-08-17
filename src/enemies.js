@@ -34,11 +34,16 @@ export class Enemy {
     this.bossPhase = 1;      // äventyrsbossarna trappar upp vid 2/3 och 1/3
     this.orbitDir = Math.random() < 0.5 ? -1 : 1;
     this.fly = worldId === 'city';
-    const hpMul = 1 + (wave - 1) * 0.23 + (wave > 10 ? (wave - 10) * 0.09 : 0);
+    // Fiendekurvan måste vara brantare än den var. Spelarens kort är additiva
+    // numera, men de multipliceras fortfarande med varandra (skada × takt ×
+    // extra skott), så en rak linje här halkar efter. Mätt: spelaren blir
+    // ~50× starkare över en lång körning, fienderna ~18× — spelaren behåller
+    // övertaget, men får det aldrig gratis.
+    const hpMul = 1 + (wave - 1) * 0.25 + (wave > 10 ? (wave - 10) * 0.10 : 0);
     this.maxHp = Math.round(t.hp * hpMul);
     this.hp = this.maxHp;
-    this.dmg = t.dmg * (1 + (wave - 1) * 0.07);
-    this.speed = t.speed * (1 + Math.min(0.35, (wave - 1) * 0.018));
+    this.dmg = t.dmg * (1 + (wave - 1) * 0.09);
+    this.speed = t.speed * (1 + Math.min(0.45, (wave - 1) * 0.022));
     // Neotropolis maskiner är byggda större än Vildheims djur. Skalan sitter
     // här så att träffytan, höjden och modellen växer i takt — skalar man
     // bara ritningen träffar man luft, och skalar man bara radien blir det
@@ -599,7 +604,7 @@ export class Enemy {
     const contact = this.radius + p.radius + 0.35;
     if (dist < contact && Math.abs(this.pos.y - p.pos.y) < this.height + 1.2 && this.hitCd <= 0) {
       const boost = this.state === 'charging' ? 1.5 : 1;
-      if (ctx.player.takeDamage(this.dmg * boost)) {
+      if (ctx.player.takeDamage(this.dmg * boost, this, ctx)) {
         this.hitCd = 0.75;
         ctx.sound.hurt();
         ctx.particles.burst(p.pos.x, p.pos.y + 1.2, p.pos.z, 12,

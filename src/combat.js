@@ -1,6 +1,7 @@
 // Projektiler, explosioner och drops.
 import { clamp, lerp, rand, TAU, angleDelta } from './math.js';
 import { terrainHeight, WATER_LEVEL } from './noise.js';
+import { CRIT_CAP } from './player.js';
 
 /** Närmaste träffpunkt mellan en sträcka och en sfär — hindrar snabba skott från att missa. */
 function segmentHitsSphere(px, py, pz, dx, dy, dz, len, cx, cy, cz, r) {
@@ -53,9 +54,9 @@ export class Combat {
       if (Math.abs(angleDelta(p.yaw, Math.atan2(dx, dz))) > arc) continue;
       if (Math.abs((e.pos.y + e.height * 0.5) - (p.pos.y + 1.3)) > e.height * 0.5 + 2.6) continue;
 
-      const crit = Math.random() < st.crit || fin;
+      const crit = Math.random() < Math.min(st.crit, CRIT_CAP) || fin;
       const dmg = st.damage * (fin ? 2.8 : 1.7) * (crit ? st.critMult : 1);
-      const killed = e.damage(dmg, ctx, crit);
+      const killed = e.damage(dmg + st.burn, ctx, crit);
       ctx.sound[crit ? 'swordCrit' : 'swordHit']();
       if (st.lifesteal > 0) p.heal(dmg * st.lifesteal);
       // rejäl knockback — svagare mot tunga fiender
@@ -177,12 +178,14 @@ export class Combat {
       const c = Math.cos(yawOff), s = Math.sin(yawOff);
       const dx = dir.x * c + dir.z * s;
       const dz = -dir.x * s + dir.z * c;
-      const crit = Math.random() < st.crit;
+      const crit = Math.random() < Math.min(st.crit, CRIT_CAP);
+      // Extra skott gör mindre — annars fördubblar ett enda kort din skada.
+      const falloff = i === 0 ? 1 : 0.75;
       this.shots.push({
         x: m.x, y: m.y, z: m.z,
         vx: dx * st.projSpeed, vy: dir.y * st.projSpeed, vz: dz * st.projSpeed,
         life: 1.7,
-        dmg: st.damage * (crit ? st.critMult : 1),
+        dmg: st.damage * falloff * (crit ? st.critMult : 1),
         crit,
         pierce: st.pierce,
         radius: st.projSize + 0.25,
@@ -206,13 +209,16 @@ export class Combat {
     let dx = target.pos.x - x, dy = target.pos.y + target.height * 0.5 - y, dz = target.pos.z - z;
     const l = Math.hypot(dx, dy, dz) || 1;
     dx /= l; dy /= l; dz /= l;
+    // drönaren skjuter en gnista, fén en trollformel — olika färg och ljud
+    const fairy = ctx.worldId !== 'city';
     this.shots.push({
       x, y, z, vx: dx * 52, vy: dy * 52, vz: dz * 52,
-      life: 1.5, dmg: ctx.player.stats.damage * 0.55, crit: false,
+      life: 1.5, dmg: ctx.player.stats.damage * 0.5, crit: false,
       pierce: 0, radius: 0.5, explosive: 0, hits: new Set(),
-      col: [1.0, 0.75, 0.25],
+      col: fairy ? [0.7, 1.0, 0.8] : [1.0, 0.75, 0.25],
     });
-    ctx.sound.tone({ f: 900, f2: 420, dur: 0.06, type: 'triangle', vol: 0.05 });
+    if (fairy) ctx.sound.tone({ f: 1250, f2: 1900, dur: 0.09, type: 'sine', vol: 0.045 });
+    else ctx.sound.tone({ f: 900, f2: 420, dur: 0.06, type: 'triangle', vol: 0.05 });
   }
 
   // ------------------------------------------------------------ fiendeskott
@@ -364,7 +370,7 @@ export class Combat {
         if (segmentHitsSphere(s.x, s.y, s.z, dx, dy, dz, len,
           e.pos.x, e.pos.y + e.height * 0.5, e.pos.z, e.radius + s.radius)) {
           s.hits.add(e);
-          const killed = e.damage(s.dmg, ctx, s.crit);
+          const killed = e.damage(s.dmg + (ctx.player.stats.burn || 0), ctx, s.crit);
           // eldbollen talar genom sin explosion, lasern knäpper elektriskt,
           // allt annat får den vanliga träffen
           if (!s.fireball) {

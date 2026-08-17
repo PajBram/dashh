@@ -8,7 +8,7 @@ import { Player } from './player.js';
 import { Enemy, WaveManager } from './enemies.js';
 import { AdventureManager, CHECKPOINT_EVERY } from './adventure.js';
 import { Combat } from './combat.js';
-import { rollChoices } from './upgrades.js';
+import { rollChoices, recalc } from './upgrades.js';
 import { WARES, REPAIR, priceOf, repairPrice } from './shop.js';
 import { terrainHeight, WATER_LEVEL } from './noise.js';
 
@@ -327,6 +327,7 @@ export class Game {
   applyCheckpoint(cp) {
     const p = this.player;
     Object.assign(p.stats, cp.stats);
+    recalc(p.stats);
     p.hp = Math.min(cp.hp, p.stats.maxHp);
     p.armor = cp.armor || 0;
     p.dashCharges = p.stats.dashMax;
@@ -361,6 +362,7 @@ export class Game {
     if (owned >= w.max || cost > this.gold) { this.sound.denied(); return false; }
     this.gold -= cost;
     w.apply(p.stats, p);
+    recalc(p.stats);
     this.shopLevels.set(id, owned + 1);
     this.sound.buy();
     return true;
@@ -371,7 +373,7 @@ export class Game {
     this.input.enabled = false;
     this.input.releaseLock();
     this.sound.levelUp();
-    this.choices = rollChoices(this.upgradeLevels, 3);
+    this.choices = rollChoices(this.upgradeLevels, 3, this.worldId);
     this.hud.showLevelUp(this.level, this.choices, (i) => this.pickUpgrade(i));
   }
 
@@ -379,6 +381,7 @@ export class Game {
     const u = this.choices[i];
     if (!u) return;
     u.apply(this.player.stats, this.player);
+    recalc(this.player.stats);
     this.upgradeLevels.set(u.id, (this.upgradeLevels.get(u.id) || 0) + 1);
     this.toast(`${u.icon} ${u.name}`);
     this.pendingLevelUps--;

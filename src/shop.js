@@ -5,25 +5,25 @@
 // bestämma sig på fem sekunder och komma vidare.
 
 export const WARES = [
-  { id: 'dmg', icon: '⚔️', name: 'WEAPONSMITH', desc: '+15% damage',
+  { id: 'dmg', icon: '⚔️', name: 'WEAPONSMITH', desc: '+10% damage',
     base: 55, grow: 1.45, max: 12,
-    apply: (st) => { st.damage *= 1.15; } },
+    apply: (st) => { st.damageBonus += 0.10; } },
 
   { id: 'hp', icon: '🛡️', name: 'PLATING', desc: '+25 max HP · heals 25',
     base: 45, grow: 1.35, max: 12,
     apply: (st, p) => { st.maxHp += 25; p.heal(25); } },
 
-  { id: 'speed', icon: '🥾', name: 'RUNNER BOOTS', desc: '+8% movement speed',
+  { id: 'speed', icon: '🥾', name: 'RUNNER BOOTS', desc: '+6% movement speed',
     base: 50, grow: 1.5, max: 6,
-    apply: (st) => { st.speed *= 1.08; } },
+    apply: (st) => { st.speedBonus += 0.06; } },
 
   { id: 'dashCd', icon: '🔋', name: 'CAPACITOR', desc: '−15% dash cooldown',
     base: 55, grow: 1.5, max: 5,
     apply: (st) => { st.dashRecharge *= 0.85; } },
 
-  { id: 'crit', icon: '🎲', name: 'LUCKSTONE', desc: '+8% crit chance',
+  { id: 'crit', icon: '🎲', name: 'LUCKSTONE', desc: '+5% crit chance',
     base: 60, grow: 1.45, max: 8,
-    apply: (st) => { st.crit += 0.08; } },
+    apply: (st) => { st.crit += 0.05; } },
 
   { id: 'regen', icon: '💚', name: 'NANITES', desc: '+1 HP per second',
     base: 70, grow: 1.5, max: 5,
