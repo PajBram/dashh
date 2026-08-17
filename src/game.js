@@ -64,6 +64,50 @@ export class Game {
     try { localStorage.setItem('dashh.best', JSON.stringify(this.best)); } catch (e) { /* ignoreras */ }
   }
 
+  /* Highscore-listan på sidan utanför.
+   *
+   * Spelet kör i en iframe på rastegar.se och når inte sidans poängsystem
+   * direkt, så de två beskeden som behövs — "en runda började" och "den
+   * slutade, så här gick det" — skickas ut med postMessage. Kör spelet
+   * utanför en ram händer ingenting; window.parent är då fönstret självt
+   * och ingen lyssnar.
+   *
+   * Bara ÖVERLEVNAD rapporteras. Äventyret återupptas från checkpoints, så
+   * en körning där är flera försök och går inte att jämföra med någon annans.
+   *
+   * DEN HÄR KODEN MÅSTE BO HÄR, inte i den byggda filen på sajten. Den låg
+   * först inklistrad i `static/games/dashh.html`, och nästa `bundle.py` hade
+   * raderat highscore-listan utan att någon märkt det.
+   */
+  runScore() {
+    // Vågen i kvadrat: djup ska väga tyngre än uthållighet, så våg 20 är värd
+    // fyra gånger våg 10 och inte två. Kills är belöningen inne i varje våg.
+    return this.waves.wave * this.waves.wave * 50 + this.kills * 25;
+  }
+
+  postToPage(payload) {
+    try {
+      if (window.parent && window.parent !== window) {
+        window.parent.postMessage(payload, window.location.origin);
+      }
+    } catch (e) { /* ingen ram, eller annan origin — strunt samma */ }
+  }
+
+  reportStart() {
+    if (this.mode !== 'survival') return;
+    this.postToPage({ dashh: 'run-start' });
+  }
+
+  reportEnd() {
+    if (this.mode !== 'survival') return;
+    this.postToPage({
+      dashh: 'run-over',
+      score: this.runScore(),
+      wave: this.waves.wave,
+      kills: this.kills,
+    });
+  }
+
   /** Svårighetstrappan: vågnummer i överlevnad, nivånummer i äventyret. */
   get tier() {
     return this.mode === 'adventure' ? Math.max(1, this.adventure.level) : this.waves.wave;
@@ -117,6 +161,7 @@ export class Game {
     this.resetRun();
     if (checkpoint) this.applyCheckpoint(checkpoint);
     this.state = 'playing';
+    this.reportStart();
     this.hud.hideOverlay();
     this.hud.setMode(this.mode);
     this.hud.showHUD(true);
@@ -175,6 +220,7 @@ export class Game {
       speed: 12, life: 1.1, size: 1.0, size2: 0.1, col: [0.4, 0.9, 1.0], alpha: 0.9, drag: 0.7, grav: -8,
     });
     this.saveBest();
+    this.reportEnd();
     setTimeout(() => {
       if (this.state !== 'dead') return;
       // I äventyret börjar man om från senast klarade checkpoint, med exakt
