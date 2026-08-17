@@ -360,20 +360,95 @@ export class Renderer {
   buildWildWorld() {
     const gl = this.gl, m = this.mesh;
     const props = scatterProps();
-    const trunks = new InstancedBatch(gl, m.cylTaper, 512);
-    const leaves = new InstancedBatch(gl, m.cone, 1024);
-    const rocks = new InstancedBatch(gl, m.box, 512);
+    const trunks = new InstancedBatch(gl, m.cylTaper, 2048);
+    const leaves = new InstancedBatch(gl, m.cone, 2048);
+    const rocks = new InstancedBatch(gl, m.box, 2048);
     const crystals = new InstancedBatch(gl, m.octa, 256);
-    const tufts = new InstancedBatch(gl, m.cone, 1024);
+    const tufts = new InstancedBatch(gl, m.cone, 6144);
+    const canopy = new InstancedBatch(gl, m.sphere, 2048);   // lövkronor och buskar
+    const petals = new InstancedBatch(gl, m.sphere, 4096);   // blomhuvuden, bär, svamphattar
+    const logsB = new InstancedBatch(gl, m.cyl, 1024);       // nedfallna stammar, svampfötter
 
     for (const t of props.trees) {
-      const h = 3.2 * t.scale;
-      trunks.push(t.x, t.y + h * 0.5, t.z, 0.5 * t.scale, h, 0.5 * t.scale, t.trunk, 0, t.rot, 0, 0);
-      for (let i = 0; i < t.tiers; i++) {
-        const f = i / t.tiers;
-        const r = (3.4 - f * 1.5) * t.scale;
-        leaves.push(t.x, t.y + h * (0.75 + f * 0.72), t.z, r, 3.0 * t.scale, r,
-          [t.leaf[0] * (1 - f * 0.12), t.leaf[1] * (1 - f * 0.1), t.leaf[2]], 0, t.rot + f, 0, 0);
+      const s = t.scale;
+      const lean = t.lean || 0;
+      if (t.kind === 'broadleaf') {
+        // lövträd: kort grov stam och ett klot av löv i tre klumpar
+        const h = 2.6 * s;
+        trunks.push(t.x, t.y + h * 0.5, t.z, 0.62 * s, h, 0.62 * s, t.trunk, lean, t.rot, 0, 0);
+        const cy = t.y + h + 1.5 * s;
+        canopy.push(t.x, cy, t.z, 3.2 * s, 2.6 * s, 3.2 * s, t.leaf, 0, t.rot, 0, 0);
+        for (let i = 0; i < 2; i++) {
+          const a = t.rot + i * 2.4;
+          canopy.push(t.x + Math.cos(a) * 1.5 * s, cy - 0.5 * s, t.z + Math.sin(a) * 1.5 * s,
+            2.1 * s, 1.8 * s, 2.1 * s,
+            [t.leaf[0] * 0.88, t.leaf[1] * 0.92, t.leaf[2]], 0, a, 0, 0);
+        }
+      } else if (t.kind === 'birch') {
+        // björk: smal ljus stam, gles krona, mörka streck på nävern
+        const h = 4.6 * s;
+        trunks.push(t.x, t.y + h * 0.5, t.z, 0.30 * s, h, 0.30 * s, t.trunk, lean, t.rot, 0, 0);
+        for (let i = 0; i < 3; i++) {
+          rocks.push(t.x, t.y + h * (0.3 + i * 0.22), t.z, 0.34 * s, 0.09 * s, 0.34 * s,
+            [0.20, 0.19, 0.18], 0, t.rot + i, 0, 0);
+        }
+        canopy.push(t.x, t.y + h + 0.9 * s, t.z, 2.3 * s, 2.0 * s, 2.3 * s, t.leaf, 0, t.rot, 0, 0);
+        canopy.push(t.x, t.y + h + 1.9 * s, t.z, 1.5 * s, 1.4 * s, 1.5 * s,
+          [t.leaf[0] * 1.05, t.leaf[1] * 1.02, t.leaf[2]], 0, -t.rot, 0, 0);
+      } else if (t.kind === 'dead') {
+        // dött träd: bar stam med ett par knotiga grenar
+        const h = 3.8 * s;
+        trunks.push(t.x, t.y + h * 0.5, t.z, 0.42 * s, h, 0.42 * s, t.trunk, lean, t.rot, 0, 0);
+        for (let i = 0; i < 3; i++) {
+          const a = t.rot + i * 2.1;
+          const by = t.y + h * (0.55 + i * 0.16);
+          trunks.push(t.x + Math.cos(a) * 0.8 * s, by, t.z + Math.sin(a) * 0.8 * s,
+            0.16 * s, 1.5 * s, 0.16 * s, t.trunk, 0.9, a, 0, 0);
+        }
+      } else {
+        const h = 3.2 * s;
+        trunks.push(t.x, t.y + h * 0.5, t.z, 0.5 * s, h, 0.5 * s, t.trunk, lean, t.rot, 0, 0);
+        for (let i = 0; i < t.tiers; i++) {
+          const f = i / t.tiers;
+          const r = (3.4 - f * 1.5) * s;
+          leaves.push(t.x, t.y + h * (0.75 + f * 0.72), t.z, r, 3.0 * s, r,
+            [t.leaf[0] * (1 - f * 0.12), t.leaf[1] * (1 - f * 0.1), t.leaf[2]], 0, t.rot + f, 0, 0);
+        }
+      }
+    }
+    for (const b of props.bushes) {
+      const s = b.scale;
+      canopy.push(b.x, b.y + 0.5 * s, b.z, 1.5 * s, 1.1 * s, 1.5 * s, b.col, 0, b.rot, 0, 0);
+      canopy.push(b.x + 0.5 * s, b.y + 0.35 * s, b.z - 0.4 * s, 1.0 * s, 0.8 * s, 1.0 * s,
+        [b.col[0] * 0.85, b.col[1] * 0.9, b.col[2]], 0, -b.rot, 0, 0);
+      if (b.berries) {
+        for (let i = 0; i < 3; i++) {
+          const a = b.rot + i * 2.1;
+          petals.push(b.x + Math.cos(a) * 0.8 * s, b.y + 0.9 * s, b.z + Math.sin(a) * 0.8 * s,
+            0.15, 0.15, 0.15, [0.85, 0.15, 0.25], 0, 0, 0, 0.15);
+        }
+      }
+    }
+    for (const l of props.logs) {
+      // liggande stam: cylindern reses på sidan med en kvarts varv
+      logsB.push(l.x, l.y + l.r, l.z, l.r * 2, l.len, l.r * 2, l.col, Math.PI / 2, l.rot, 0, 0);
+    }
+    for (const m of props.mushrooms) {
+      const s = m.scale;
+      logsB.push(m.x, m.y + 0.16 * s, m.z, 0.10 * s, 0.32 * s, 0.10 * s, [0.88, 0.85, 0.76], 0, 0, 0, 0);
+      petals.push(m.x, m.y + 0.34 * s, m.z, 0.34 * s, 0.22 * s, 0.34 * s, m.col, 0, 0, 0, 0.05);
+    }
+    for (const f of props.flowers) {
+      const s = f.scale;
+      tufts.push(f.x, f.y + 0.22 * s, f.z, 0.10 * s, 0.5 * s, 0.10 * s, [0.22, 0.40, 0.16], 0, f.rot, 0, 0);
+      petals.push(f.x, f.y + 0.50 * s, f.z, 0.32 * s, 0.24 * s, 0.32 * s, f.col, 0, f.rot, 0, 0.28);
+    }
+    for (const r of props.reeds) {
+      const s = r.scale;
+      for (let i = 0; i < 3; i++) {
+        const a = r.rot + i * 2.1;
+        tufts.push(r.x + Math.cos(a) * 0.18, r.y + 0.7 * s, r.z + Math.sin(a) * 0.18,
+          0.07, 1.5 * s, 0.07, [0.35, 0.42, 0.20], 0.08, a, 0, 0);
       }
     }
     for (const r of props.rocks) {
@@ -389,7 +464,7 @@ export class Renderer {
     }
     return {
       terrain: uploadMesh(gl, buildTerrainMesh(200)),
-      static: [trunks, leaves, rocks, crystals, tufts],
+      static: [trunks, leaves, rocks, crystals, tufts, canopy, petals, logsB],
       props,
     };
   }

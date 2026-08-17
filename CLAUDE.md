@@ -151,6 +151,12 @@ Fullscreen sköts av sajtens egen `static/js/fullscreen.js` — bygg ingen egen.
   1,35 — Vildheims djur och alla bossar på 1.
 - **Mått i push() är hela meter**, inte halva. En bil på 3 m försvinner sedd
   från gatan trettio meter under — flygtaxibilarna är 5,4 m av det skälet.
+- **Vildheims skog har fyra arter, fördelade efter höjd** (`scatterProps`):
+  lövträd och björk nere vid vattnet, gran högre upp, döda stammar högst.
+  Lövverket skiftar mot rost på höjden. Gör inte om den till en enda sort —
+  en skog av samma träd tusen gånger är det som får en värld att kännas
+  gjord i stället för växt. Blommorna växer dessutom i ängar styrda av ett
+  lågfrekvent brus, inte jämnt utspridda.
 - **Neotropolis fönster är enskilda rutor, mest släckta.** Band runt hela
   fasaden blir lysande lameller som ser ut som bokhyllor; det är mörkret
   mellan rutorna som gör att de tända läser som ljus. Höj inte andelen tända.

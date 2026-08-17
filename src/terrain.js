@@ -163,6 +163,7 @@ export class ColliderGrid {
  */
 export function scatterProps() {
   const trees = [], rocks = [], crystals = [], grassTufts = [];
+  const flowers = [], bushes = [], logs = [], mushrooms = [], reeds = [];
   const grid = new ColliderGrid(8);
   const R = 104;
 
@@ -177,20 +178,52 @@ export function scatterProps() {
     }
   };
 
-  place(520, (x, z, h, slope) => {
+  // Skogen har fyra arter, fördelade efter höjd: lövträd och björk nere vid
+  // vattnet, gran längre upp, och döda stammar högst där det är kargt. En
+  // skog av ett enda träd sett tusen gånger är det som får en värld att
+  // kännas gjord i stället för växt.
+  place(760, (x, z, h, slope) => {
     if (h < WATER_LEVEL + 0.8 || h > 34 || slope > 0.34) return;
     if (Math.random() > 0.72) return;
-    const scale = rand(0.8, 1.5);
+    const alt = clamp((h - WATER_LEVEL) / 32, 0, 1);
+    const r = Math.random();
+    let kind;
+    if (alt < 0.32) kind = r < 0.5 ? 'broadleaf' : r < 0.74 ? 'birch' : 'pine';
+    else if (alt < 0.68) kind = r < 0.62 ? 'pine' : r < 0.88 ? 'broadleaf' : 'birch';
+    else kind = r < 0.78 ? 'pine' : 'dead';
+
+    const scale = rand(0.8, 1.5) * (kind === 'broadleaf' ? 1.1 : 1);
     const hue = rand(0.6, 1.0);
+    const trunk = kind === 'birch'
+      ? [0.78, 0.76, 0.70]
+      : kind === 'dead'
+        ? [0.34, 0.31, 0.28]
+        : [0.24 * hue, 0.16 * hue, 0.11 * hue];
+    // lövverket skiftar mot gult och rost på höjden, som en höstsida
+    const warm = alt * 0.5 + rand(0, 0.3);
     trees.push({
-      x, y: h, z,
-      scale,
-      rot: rand(TAU),
-      trunk: [0.24 * hue, 0.16 * hue, 0.11 * hue],
-      leaf: [lerp(0.10, 0.24, Math.random()), lerp(0.34, 0.55, hue), lerp(0.14, 0.26, Math.random())],
+      x, y: h, z, kind, scale, rot: rand(TAU), trunk,
+      leaf: kind === 'broadleaf'
+        ? [lerp(0.18, 0.52, warm), lerp(0.42, 0.50, hue), lerp(0.12, 0.16, Math.random())]
+        : kind === 'birch'
+          ? [lerp(0.35, 0.62, warm), lerp(0.60, 0.68, hue), 0.22]
+          : [lerp(0.10, 0.24, Math.random()), lerp(0.30, 0.52, hue), lerp(0.14, 0.26, Math.random())],
       tiers: randInt(2, 3),
+      lean: rand(-0.09, 0.09),
     });
     grid.add({ x, z, r: 0.6 * scale });
+
+    // svampar och nedfallna stammar hör hemma vid trädens fötter
+    if (Math.random() < 0.16) {
+      const a = rand(TAU), d = rand(1.2, 2.6);
+      const mx = x + Math.cos(a) * d, mz = z + Math.sin(a) * d;
+      mushrooms.push({ x: mx, y: terrainHeight(mx, mz), z: mz, scale: rand(0.5, 1.0),
+        col: Math.random() < 0.55 ? [0.78, 0.20, 0.18] : [0.85, 0.72, 0.45] });
+    }
+    if (Math.random() < 0.05) {
+      logs.push({ x, y: h, z, rot: rand(TAU), len: rand(2.4, 4.4), r: rand(0.28, 0.45),
+        col: [0.26 * hue, 0.19 * hue, 0.13 * hue] });
+    }
   });
 
   place(420, (x, z, h, slope) => {
@@ -224,7 +257,40 @@ export function scatterProps() {
     grassTufts.push({ x, y: h, z, scale: rand(0.35, 0.85), rot: rand(TAU) });
   });
 
-  return { trees, rocks, crystals, grassTufts, grid };
+  // Blommor växer i ängar, inte jämnt utspridda: ett lågfrekvent brus
+  // avgör var marken blommar, så man går genom fält i stället för prickar.
+  const MEADOW = [
+    [1.0, 0.85, 0.25], [0.95, 0.35, 0.45], [0.70, 0.55, 1.0],
+    [1.0, 1.0, 0.95], [1.0, 0.55, 0.20],
+  ];
+  place(1400, (x, z, h, slope) => {
+    if (h < WATER_LEVEL + 0.7 || h > 26 || slope > 0.24) return;
+    const meadow = fbm(x * 0.035 + 8.1, z * 0.035 - 3.7, 2);
+    if (meadow < 0.12) return;
+    flowers.push({
+      x, y: h, z, scale: rand(0.5, 1.0), rot: rand(TAU),
+      col: MEADOW[randInt(0, MEADOW.length - 1)],
+    });
+  });
+
+  place(420, (x, z, h, slope) => {
+    if (h < WATER_LEVEL + 0.8 || h > 30 || slope > 0.32) return;
+    if (Math.random() > 0.4) return;
+    const s = rand(0.7, 1.5);
+    bushes.push({ x, y: h, z, scale: s, rot: rand(TAU),
+      col: [lerp(0.10, 0.20, Math.random()), lerp(0.26, 0.42, Math.random()), 0.14],
+      berries: Math.random() < 0.3 });
+  });
+
+  // vass står i strandkanten, precis ovanför vattenlinjen
+  place(700, (x, z, h) => {
+    const d = h - WATER_LEVEL;
+    if (d < -0.4 || d > 0.9) return;
+    if (Math.random() > 0.45) return;
+    reeds.push({ x, y: h, z, scale: rand(0.8, 1.6), rot: rand(TAU) });
+  });
+
+  return { trees, rocks, crystals, grassTufts, flowers, bushes, logs, mushrooms, reeds, grid };
 }
 
 /** Neotropolis: husens kollisionslådor plus gatljus och takantenner. */
