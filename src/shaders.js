@@ -3,19 +3,45 @@
 const FOG = /* glsl */`
 uniform vec3 uFogCol;
 uniform vec2 uFog;            // x = startavstånd, y = slutavstånd
+uniform float uFogHeight;     // hur snabbt diset tunnas ut uppåt
 vec3 applyFog(vec3 col, float dist){
   return mix(col, uFogCol, smoothstep(uFog.x, uFog.y, dist));
+}
+/* Höjdberoende dis: tätt nere i dalarna och på gatunivå, tunnare högt upp.
+   Det är den som ger djup åt landskapet.
+
+   Tunningen räknas på MEDELHÖJDEN mellan ögat och punkten, inte på punktens
+   egen höjd. Ljuset från en bergstopp har ju färdats hela vägen ner genom
+   det låga diset för att nå en spelare som står på marken. Med bara punktens
+   höjd slutade bergsranden döljas och lade sig som en mörk mur runt hela
+   världen — det såg ut som att himlen blivit grå. */
+vec3 applyFogH(vec3 col, float dist, float worldY){
+  float f = smoothstep(uFog.x, uFog.y, dist);
+  float avgY = max((worldY + uEye.y) * 0.5, 0.0);
+  f *= exp(-avgY * uFogHeight);
+  return mix(col, uFogCol, clamp(f, 0.0, 1.0));
 }`;
 
 const LIGHT = /* glsl */`
 uniform vec3 uSunDir;         // enhetsvektor mot ljuset
 uniform vec3 uSunCol;
 uniform vec3 uAmb;
+uniform vec3 uSkyTint;        // himlens färg ovanifrån
+uniform vec3 uGroundTint;     // markens återkast underifrån
+/* Halvsfärsljus: ytor som vetter uppåt får himlens färg, nedåtvända får
+   markens återkast. Tinterna ligger kring 1,0 så helhetsljusstyrkan är
+   densamma som förut — det här flyttar kulör, inte exponering. */
 vec3 shade(vec3 n, vec3 albedo){
   float d = max(dot(n, uSunDir), 0.0);
   float wrap = dot(n, uSunDir) * 0.5 + 0.5;       // mjukt halvljus
   float sky = n.y * 0.5 + 0.5;                    // himmelsbidrag uppifrån
-  return albedo * (uAmb * (0.55 + 0.45 * sky) + uSunCol * (d * 0.9 + wrap * 0.22));
+  vec3 ambient = uAmb * (0.55 + 0.45 * sky) * mix(uGroundTint, uSkyTint, sky);
+  return albedo * (ambient + uSunCol * (d * 0.9 + wrap * 0.22));
+}
+/* Smal glansdager — får metall, neon och våta ytor att fånga ljuset. */
+vec3 specular(vec3 n, vec3 view, float strength){
+  vec3 hv = normalize(uSunDir + view);
+  return uSunCol * pow(max(dot(n, hv), 0.0), 46.0) * strength;
 }`;
 
 // ------------------------------------------------------------------ terräng
@@ -61,7 +87,7 @@ void main(){
   float ring = smoothstep(3.2, 2.2, abs(d - 2.6)) * 0.10;
   col += vec3(0.25, 0.85, 1.0) * ring * lamp;
   col += vec3(0.05, 0.22, 0.30) * max(0.0, 1.0 - d * 0.06) * 0.25 * uNight;
-  frag = vec4(applyFog(col, distance(vW, uEye)), 1.0);
+  frag = vec4(applyFogH(col, distance(vW, uEye), vW.y), 1.0);
 }`;
 
 // -------------------------------------------------------------- instansierat
@@ -108,8 +134,10 @@ void main(){
   float rim = pow(1.0 - max(dot(n, view), 0.0), 2.5);
   col += vC * rim * (0.35 + vGlow * 1.2);
   col += vC * vGlow * 1.35;
+  // självlysande ytor behöver ingen dager — de lyser redan
+  col += specular(n, view, 0.22 * (1.0 - min(vGlow, 1.0)));
   float dist = distance(vW, uEye);
-  col = applyFog(col, dist);
+  col = applyFogH(col, dist, vW.y);
   frag = vec4(col, 1.0);
 }`;
 
@@ -189,6 +217,8 @@ uniform vec3 uSunCol;
 uniform vec3 uSkyTop;
 uniform vec3 uSkyHorizon;
 uniform float uNight;
+uniform float uTime;
+uniform float uClouds;   // 0 = klart, 1 = molnigt
 out vec4 frag;
 
 float hash13(vec3 p){
@@ -197,12 +227,56 @@ float hash13(vec3 p){
   return fract(p.x * p.y * p.z * (p.x + p.y + p.z));
 }
 
+float hash12(vec2 p){
+  vec3 q = fract(vec3(p.xyx) * 0.1031);
+  q += dot(q, q.yzx + 33.33);
+  return fract((q.x + q.y) * q.z);
+}
+
+float vnoise(vec2 p){
+  vec2 i = floor(p), f = fract(p);
+  vec2 u = f * f * (3.0 - 2.0 * f);
+  return mix(mix(hash12(i), hash12(i + vec2(1,0)), u.x),
+             mix(hash12(i + vec2(0,1)), hash12(i + vec2(1,1)), u.x), u.y);
+}
+
+/* Fyra oktaver räcker för moln som håller ihop både nära zenit och nere
+   vid horisonten, där projektionen tänjs ut som mest. */
+float fbm2(vec2 p){
+  float sum = 0.0, amp = 0.5;
+  for (int i = 0; i < 4; i++) { sum += vnoise(p) * amp; p = p * 2.03 + 11.7; amp *= 0.5; }
+  return sum;
+}
+
 void main(){
   vec4 far = uInvVP * vec4(vNdc, 1.0, 1.0);
   vec3 dir = normalize(far.xyz / far.w - uEye);
 
   float h = clamp(dir.y * 0.5 + 0.5, 0.0, 1.0);
   vec3 col = mix(uSkyHorizon, uSkyTop, pow(h, 0.85));
+
+  /* Moln: blickriktningen projiceras ner på ett plan högt över spelaren och
+     bruset samplas där, så täcket ligger stilla i världen i stället för att
+     följa med kameran. De driver sakta med tiden. */
+  if (uClouds > 0.01 && dir.y > 0.10) {
+    // Nämnaren MÅSTE klampas: nära horisonten går dir.xz/dir.y mot
+    // oändligheten, bruset samplas i grus och himlen blir grå sörja i
+    // stället för moln. Det såg ut som mulet väder över hela kartan.
+    vec2 cp = dir.xz / max(dir.y, 0.22) * 0.30 + vec2(uTime * 0.0035, uTime * 0.0022);
+    float c = fbm2(cp);
+    // tunnare mot horisonten, där lagret ses nästan från sidan
+    // Molnen håller sig till den övre himlen. Närmare horisonten tänjs
+    // projektionen ut till stora suddiga fält som läser som mulet väder i
+    // stället för som moln — där gör de mer skada än nytta.
+    float band = smoothstep(0.12, 0.45, dir.y);
+    // Tröskeln är högt satt med flit: bara brusets toppar blir moln, så
+    // himlen förblir mest öppen och molnen läser som moln, inte som mulet.
+    float cover = smoothstep(0.56, 0.85, c) * band * uClouds;
+    // solsidan av molnen lyser upp, undersidan är grå
+    float lit = smoothstep(0.0, 0.6, dot(normalize(vec3(dir.x, 0.35, dir.z)), uSunDir));
+    vec3 cloudCol = mix(mix(uSkyHorizon * 1.3, vec3(1.0), 0.68), uSunCol * 0.85 + 0.3, lit * 0.5);
+    col = mix(col, cloudCol, clamp(cover, 0.0, 0.82));
+  }
 
   // stjärnor på natten
   if (uNight > 0.01) {

@@ -151,6 +151,15 @@ Fullscreen sköts av sajtens egen `static/js/fullscreen.js` — bygg ingen egen.
   1,35 — Vildheims djur och alla bossar på 1.
 - **Mått i push() är hela meter**, inte halva. En bil på 3 m försvinner sedd
   från gatan trettio meter under — flygtaxibilarna är 5,4 m av det skälet.
+- **Höjddimman räknar på medelhöjden mellan ögat och punkten**, inte på
+  punktens egen höjd. Ljuset från en bergstopp har färdats hela vägen ner
+  genom det låga diset. Räknar man bara på punktens höjd slutar bergsranden
+  döljas och lägger sig som en mörk mur runt världen — det ser ut som att
+  himlen blivit grå.
+- **Molnen håller sig ovanför `dir.y ≈ 0,12`**, och nämnaren i projektionen
+  `dir.xz / max(dir.y, 0.22)` måste vara klampad. Utan klampen samplas bruset
+  i grus nära horisonten; utan höjdgränsen tänjs det till stora suddiga fält
+  som läser som mulet väder. Båda misstagen gjordes 2026-08-17.
 - **Vildheims skog har fyra arter, fördelade efter höjd** (`scatterProps`):
   lövträd och björk nere vid vattnet, gran högre upp, döda stammar högst.
   Lövverket skiftar mot rost på höjden. Gör inte om den till en enda sort —

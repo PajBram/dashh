@@ -90,6 +90,12 @@ export function computeEnv(dayTime, worldId = 'wild') {
       night: 1,
       fogNear: 42,
       fogFar: 200,
+      // Staden: kall magenta från skyltarna ovanifrån, gatans neon underifrån.
+      skyTint: [0.92, 0.80, 1.15],
+      groundTint: [1.10, 0.86, 1.05],
+      // Diset ligger på gatunivå och tunnas ut mot tornens toppar.
+      fogHeight: 0.013,
+      clouds: 0,
     };
   }
   const a = (dayTime - 0.25) * TAU;
@@ -114,6 +120,13 @@ export function computeEnv(dayTime, worldId = 'wild') {
   const dir = moon ? { x: -sx, y: -sy, z: -sz } : { x: sx, y: sy, z: sz };
   const strength = moon ? 0.32 : lerp(0.45, 1.0, dayT);
 
+  // Halvsfärstinter: himlens kulör uppifrån, en varm markreflex underifrån.
+  // Normaliserade kring 1,0 så ljusstyrkan är oförändrad — bara kulören rör sig.
+  const norm = (c, amount) => {
+    const avg = (c[0] + c[1] + c[2]) / 3 || 1;
+    return [lerp(1, c[0] / avg, amount), lerp(1, c[1] / avg, amount), lerp(1, c[2] / avg, amount)];
+  };
+
   return {
     sunDir: dir,
     sunCol: [pal.sun[0] * strength, pal.sun[1] * strength, pal.sun[2] * strength],
@@ -121,9 +134,15 @@ export function computeEnv(dayTime, worldId = 'wild') {
     fogCol: pal.fog,
     skyTop: pal.top,
     skyHor: pal.hor,
+    skyTint: norm(pal.top, 0.55),
+    groundTint: norm([0.42, 0.38, 0.26], 0.35),   // mossa och jord kastar tillbaka varmt
     night,
     fogNear: 44,
     fogFar: 178,
+    // Dalarna behåller sitt dis medan bergstopparna sticker upp ur det.
+    fogHeight: 0.009,
+    // Molnen tunnas ut på natten, då man ändå bara ser stjärnor genom dem.
+    clouds: lerp(0.35, 1.0, dayT),
   };
 }
 
@@ -493,8 +512,11 @@ export class Renderer {
     p.v3('uSunDir', env.sunDir.x, env.sunDir.y, env.sunDir.z);
     p.v3('uSunCol', env.sunCol);
     p.v3('uAmb', env.amb);
+    p.v3('uSkyTint', env.skyTint);
+    p.v3('uGroundTint', env.groundTint);
     p.v3('uFogCol', env.fogCol);
     p.v2('uFog', env.fogNear, env.fogFar);
+    p.f('uFogHeight', env.fogHeight);
     p.v3('uEye', eye.x, eye.y, eye.z);
     p.m4('uVP', this.vp);
   }
@@ -529,7 +551,9 @@ export class Renderer {
       .v3('uSunCol', env.sunCol)
       .v3('uSkyTop', env.skyTop)
       .v3('uSkyHorizon', env.skyHor)
-      .f('uNight', env.night);
+      .f('uNight', env.night)
+      .f('uTime', time)
+      .f('uClouds', env.clouds);
     gl.bindVertexArray(null);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
     gl.enable(gl.DEPTH_TEST); gl.depthMask(true);
