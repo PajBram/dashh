@@ -53,8 +53,8 @@ export class HUD {
   /** Toppraden heter olika saker i de två spelsätten. */
   setMode(mode) {
     const adv = mode === 'adventure';
-    $('waveLbl').textContent = adv ? 'NIVÅ' : 'VÅG';
-    $('levelLbl').textContent = adv ? 'RANG' : 'NIVÅ';
+    $('waveLbl').textContent = adv ? 'LEVEL' : 'WAVE';
+    $('levelLbl').textContent = adv ? 'RANK' : 'LEVEL';
     $('goldStat').classList.toggle('hidden', !adv);   // guld finns bara i äventyret
   }
 
@@ -383,24 +383,24 @@ export class HUD {
       <div class="screen">
         <div class="title">DASHH</div>
         <div class="subtitle">VOIDFALL<span class="betaTag">${VERSION}</span></div>
-        <div class="betaNote">tidig version — buggar och konstigheter förekommer, säg gärna till</div>
+        <div class="betaNote">early build — expect bugs and rough edges, and do tell me about them</div>
         <div class="modes">
           <div class="mode surv" data-m="survival">
             <div class="wIcon">🌊</div>
-            <div class="wName">ÖVERLEVNAD</div>
-            <div class="wDesc">En arena, våg efter våg, boss var femte.
-              Det slutar bara på ett sätt — frågan är hur långt du kom.</div>
-            <div class="wTag">ETT ENDA LÅNGT ANDETAG</div>
+            <div class="wName">SURVIVAL</div>
+            <div class="wDesc">One arena, wave after wave, a boss every fifth.
+              It ends only one way — the question is how far you got.</div>
+            <div class="wTag">ONE LONG BREATH</div>
           </div>
           <div class="mode adv" data-m="adventure">
             <div class="wIcon">🗺️</div>
-            <div class="wName">ÄVENTYR</div>
-            <div class="wDesc">Nivå efter nivå på egna kartor. Monstren står utplacerade
-              och väntar — leta upp dem. Boss var tredje nivå.</div>
-            <div class="wTag">NYTT · BYGGS UT</div>
+            <div class="wName">ADVENTURE</div>
+            <div class="wDesc">Level after level on maps of their own. The monsters are
+              out there waiting — go and find them. A boss every third level.</div>
+            <div class="wTag">NEW · GROWING</div>
           </div>
         </div>
-        <div class="hint">välj spelsätt</div>
+        <div class="hint">choose how to play</div>
       </div>`);
     this.overlay.querySelectorAll('.mode').forEach((el) => {
       el.addEventListener('click', () => onPick(el.dataset.m));
@@ -410,53 +410,53 @@ export class HUD {
   showStart(onPick, touch, mode = 'survival', onBack = null, checkpoint = null, onResume = null) {
     this._cursor = null;
     const keys = touch ? `
-          <div class="key"><b>VÄNSTER HALVA</b> Spak — rör dig</div>
-          <div class="key"><b>HÖGER HALVA</b> Dra — sikta</div>
+          <div class="key"><b>LEFT HALF</b> Stick — move</div>
+          <div class="key"><b>RIGHT HALF</b> Drag — aim</div>
           <div class="key"><b>ATK</b> Attack</div>
-          <div class="key"><b>DASH</b> Dash · osårbar</div>
-          <div class="key"><b>▲</b> Hoppa · håll för att flyga</div>
-          <div class="key"><b>🔥</b> Eldboll (Vildheim)</div>` : `
-          <div class="key"><b>WASD</b> Rör dig</div>
-          <div class="key"><b>MUS</b> Sikta · mot kanten = svep vyn</div>
-          <div class="key"><b>VÄNSTERKLICK</b> Attack</div>
-          <div class="key"><b>C</b> Eldboll (Vildheim)</div>
+          <div class="key"><b>DASH</b> Dash · invulnerable</div>
+          <div class="key"><b>▲</b> Jump · hold to fly</div>
+          <div class="key"><b>🔥</b> Fireball (Vildheim)</div>` : `
+          <div class="key"><b>WASD</b> Move</div>
+          <div class="key"><b>MOUSE</b> Aim · to the edge sweeps the view</div>
+          <div class="key"><b>LEFT CLICK</b> Attack</div>
+          <div class="key"><b>C</b> Fireball (Vildheim)</div>
           <div class="key"><b>SHIFT</b> Dash</div>
-          <div class="key"><b>MELLANSLAG</b> Hoppa / flyg</div>
-          <div class="key"><b>ESC</b> Paus</div>`;
+          <div class="key"><b>SPACE</b> Jump / fly</div>
+          <div class="key"><b>ESC</b> Pause</div>`;
     const adv = mode === 'adventure';
     this.showOverlay(`
       <div class="screen">
         <div class="title">DASHH</div>
-        <div class="subtitle">${adv ? 'ÄVENTYR' : 'ÖVERLEVNAD'}<span class="betaTag">${VERSION}</span></div>
-        <div class="betaNote">tidig version — buggar och konstigheter förekommer, säg gärna till</div>
+        <div class="subtitle">${adv ? 'ADVENTURE' : 'SURVIVAL'}<span class="betaTag">${VERSION}</span></div>
+        <div class="betaNote">early build — expect bugs and rough edges, and do tell me about them</div>
         ${checkpoint ? `
         <div class="resume">
-          <button class="cta" id="btnResume">FORTSÄTT — NIVÅ ${checkpoint.level + 1}</button>
+          <button class="cta" id="btnResume">CONTINUE — LEVEL ${checkpoint.level + 1}</button>
           <div class="hint">${checkpoint.world === 'city' ? 'Neotropolis' : 'Vildheim'} ·
-            checkpoint på nivå ${checkpoint.level} · ${checkpoint.gold} guld ·
-            rustning ${checkpoint.armor || 0}</div>
+            checkpoint at level ${checkpoint.level} · ${checkpoint.gold} gold ·
+            armour ${checkpoint.armor || 0}</div>
         </div>` : ''}
         <div class="worlds">
           <div class="world wild" data-w="wild">
             <div class="wIcon">🌲</div>
             <div class="wName">VILDHEIM</div>
-            <div class="wDesc">Grönskande vildmark med skogar, sjöar och berg.
-              En krigare i läder med svärd — och eldbollar på <b>C</b>.</div>
-            <div class="wTag">SVÄRD · C = ELDBOLL</div>
+            <div class="wDesc">Green wilderness of forests, lakes and mountains.
+              A warrior in leather with a sword — and fireballs on <b>C</b>.</div>
+            <div class="wTag">SWORD · C = FIREBALL</div>
           </div>
           <div class="world city" data-w="city">
             <div class="wIcon">🌆</div>
             <div class="wName">NEOTROPOLIS</div>
-            <div class="wDesc">Neonstad i evig natt. Flyg som cyborg mellan skyskraporna
-              och bränn monstren med laser ur händerna.</div>
-            <div class="wTag">HÅLL MELLANSLAG = FLYG</div>
+            <div class="wDesc">A neon city in endless night. Fly between the towers as a
+              cyborg and burn the machines down with lasers from your palms.</div>
+            <div class="wTag">HOLD SPACE = FLY</div>
           </div>
         </div>
         <div class="keys">${keys}</div>
         <div class="hint">${checkpoint
-          ? 'väljer du en värld börjar ett nytt äventyr — checkpointen ligger kvar tills du når en ny'
-          : `välj din värld — ${adv ? 'du stannar i den hela äventyret' : 'överlev vågorna'}`}</div>
-        ${onBack ? '<div class="hint back" id="btnBack">← tillbaka till spelsätt</div>' : ''}
+          ? 'picking a world starts a new adventure — your checkpoint keeps until you reach another'
+          : `choose your world — ${adv ? 'you stay in it for the whole adventure' : 'outlast the waves'}`}</div>
+        ${onBack ? '<div class="hint back" id="btnBack">← back to game modes</div>' : ''}
       </div>`);
     this.overlay.querySelectorAll('.world').forEach((el) => {
       el.addEventListener('click', () => onPick(el.dataset.w));
@@ -469,14 +469,14 @@ export class HUD {
   showFailed(g, mission, onRetry) {
     this.showOverlay(`
       <div class="screen">
-        <div class="goTitle" style="font-size:clamp(34px,7vw,64px)">UPPDRAGET MISSLYCKADES</div>
+        <div class="goTitle" style="font-size:clamp(34px,7vw,64px)">MISSION FAILED</div>
         <div class="hint" style="margin:10px 0 0">${mission ? mission.title : ''}</div>
         <div class="results">
-          <div class="result"><div class="rl">NIVÅ</div><div class="rv">${g.adventure.level}</div></div>
+          <div class="result"><div class="rl">LEVEL</div><div class="rv">${g.adventure.level}</div></div>
           <div class="result"><div class="rl">KILLS</div><div class="rv">${g.kills}</div></div>
         </div>
-        <button class="cta" id="btnRetry">FÖRSÖK IGEN</button>
-        <div class="hint">nivån börjar om — du behåller allt du skaffat</div>
+        <button class="cta" id="btnRetry">TRY AGAIN</button>
+        <div class="hint">the level restarts — you keep everything you earned</div>
       </div>`);
     $('btnRetry').addEventListener('click', onRetry);
   }
@@ -502,24 +502,24 @@ export class HUD {
           <div class="name">${w.name}</div>
           <div class="desc">${w.desc}</div>
           ${owned ? `<div class="own">×${owned}</div>` : ''}
-          <div class="price">${sold ? 'SLUT' : `${cost} <i>⬤</i>`}</div>
+          <div class="price">${sold ? 'SOLD OUT' : `${cost} <i>⬤</i>`}</div>
         </div>`;
     }).join('') + `
         <div class="ware ${rep && rep <= g.gold ? '' : 'poor'}" data-id="${REPAIR.id}">
           <div class="icon">${REPAIR.icon}</div>
           <div class="name">${REPAIR.name}</div>
           <div class="desc">${REPAIR.desc}</div>
-          <div class="price">${rep ? `${rep} <i>⬤</i>` : 'HELT'}</div>
+          <div class="price">${rep ? `${rep} <i>⬤</i>` : 'FULL'}</div>
         </div>`;
 
     this.showOverlay(`
       <div class="screen shop">
-        <div class="lvlTitle">NIVÅ ${g.adventure.level} KLARAD${g.levelReward ? ` · +${g.levelReward} GULD` : ''}</div>
+        <div class="lvlTitle">LEVEL ${g.adventure.level} CLEARED${g.levelReward ? ` · +${g.levelReward} GOLD` : ''}</div>
         <div class="lvlSub">SHOP</div>
-        <div class="purse">GULD <b>${g.gold}</b></div>
+        <div class="purse">GOLD <b>${g.gold}</b></div>
         <div class="wares">${cards}</div>
-        <button class="cta" id="btnNext">${boss ? `VIDARE — NIVÅ ${next}: BOSS` : `VIDARE — NIVÅ ${next}`}</button>
-        <div class="hint">klicka för att köpa · priset stiger för varje exemplar</div>
+        <button class="cta" id="btnNext">${boss ? `ONWARD — LEVEL ${next}: BOSS` : `ONWARD — LEVEL ${next}`}</button>
+        <div class="hint">click to buy · each one you own raises the price</div>
       </div>`);
     this.overlay.querySelectorAll('.ware').forEach((el) => {
       el.addEventListener('click', () => onBuy(el.dataset.id));
@@ -537,10 +537,10 @@ export class HUD {
       </div>`).join('');
     this.showOverlay(`
       <div class="screen">
-        <div class="lvlTitle">NIVÅ ${level}</div>
-        <div class="lvlSub">VÄLJ EN UPPGRADERING</div>
+        <div class="lvlTitle">LEVEL ${level}</div>
+        <div class="lvlSub">CHOOSE AN UPGRADE</div>
         <div class="cards">${cards}</div>
-        <div class="hint">klicka eller tryck 1 · 2 · 3</div>
+        <div class="hint">click, or press 1 · 2 · 3</div>
       </div>`);
     this.overlay.querySelectorAll('.card').forEach((el) => {
       el.addEventListener('click', () => onPick(+el.dataset.i));
@@ -550,9 +550,9 @@ export class HUD {
   showPause(onResume) {
     this.showOverlay(`
       <div class="screen">
-        <div class="title" style="font-size:clamp(40px,8vw,84px)">PAUSAD</div>
-        <button class="cta" id="btnResume">FORTSÄTT</button>
-        <div class="hint">esc eller klicka för att återgå</div>
+        <div class="title" style="font-size:clamp(40px,8vw,84px)">PAUSED</div>
+        <button class="cta" id="btnResume">RESUME</button>
+        <div class="hint">esc or click to go back in</div>
       </div>`);
     $('btnResume').addEventListener('click', onResume);
   }
@@ -561,27 +561,27 @@ export class HUD {
     const t = Math.floor(g.elapsed);
     const adv = g.mode === 'adventure';
     const best = adv
-      ? `bäst hittills: nivå ${g.best.stage} · ${g.best.kills} kills`
-      : `bäst hittills: våg ${g.best.wave} · ${g.best.kills} kills`;
+      ? `best so far: level ${g.best.stage} · ${g.best.kills} kills`
+      : `best so far: wave ${g.best.wave} · ${g.best.kills} kills`;
     this.showOverlay(`
       <div class="screen">
-        <div class="goTitle">DU FÖLL</div>
+        <div class="goTitle">YOU FELL</div>
         <div class="hint" style="margin:4px 0 0">${g.worldId === 'city' ? 'NEOTROPOLIS' : 'VILDHEIM'}
-          · ${adv ? 'ÄVENTYR' : 'ÖVERLEVNAD'}</div>
+          · ${adv ? 'ADVENTURE' : 'SURVIVAL'}</div>
         <div class="results">
-          <div class="result"><div class="rl">${adv ? 'NIVÅ' : 'VÅG'}</div>
+          <div class="result"><div class="rl">${adv ? 'LEVEL' : 'WAVE'}</div>
             <div class="rv">${adv ? g.adventure.level : g.waves.wave}</div></div>
-          <div class="result"><div class="rl">${adv ? 'RANG' : 'NIVÅ'}</div><div class="rv">${g.level}</div></div>
+          <div class="result"><div class="rl">${adv ? 'RANK' : 'LEVEL'}</div><div class="rv">${g.level}</div></div>
           <div class="result"><div class="rl">KILLS</div><div class="rv">${g.kills}</div></div>
-          ${adv ? `<div class="result"><div class="rl">GULD</div><div class="rv">${g.goldEarned}</div></div>` : ''}
-          <div class="result"><div class="rl">TID</div><div class="rv">${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}</div></div>
-          <div class="result"><div class="rl">SKADA</div><div class="rv">${Math.round(g.damageDealt)}</div></div>
+          ${adv ? `<div class="result"><div class="rl">GOLD</div><div class="rv">${g.goldEarned}</div></div>` : ''}
+          <div class="result"><div class="rl">TIME</div><div class="rv">${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}</div></div>
+          <div class="result"><div class="rl">DAMAGE</div><div class="rv">${Math.round(g.damageDealt)}</div></div>
         </div>
         <button class="cta" id="btnRestart">${checkpoint
-          ? `FORTSÄTT — NIVÅ ${checkpoint.level + 1}` : 'SPELA IGEN'}</button>
-        <button class="cta alt" id="btnMenu">TILL MENYN</button>
+          ? `CONTINUE — LEVEL ${checkpoint.level + 1}` : 'PLAY AGAIN'}</button>
+        <button class="cta alt" id="btnMenu">MAIN MENU</button>
         <div class="hint">${checkpoint
-          ? `du återvänder till checkpointen på nivå ${checkpoint.level}, med allt du hade där`
+          ? `you return to the checkpoint at level ${checkpoint.level}, with everything you had there`
           : best}</div>
       </div>`);
     $('btnRestart').addEventListener('click', onRestart);

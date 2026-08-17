@@ -5,7 +5,7 @@ export function initGL(canvas) {
     antialias: true, alpha: false, depth: true, stencil: false,
     powerPreference: 'high-performance',
   });
-  if (!gl) throw new Error('WebGL2 stöds inte av den här webbläsaren.');
+  if (!gl) throw new Error('This browser does not support WebGL2.');
   gl.enable(gl.DEPTH_TEST);
   gl.enable(gl.CULL_FACE);
   gl.cullFace(gl.BACK);

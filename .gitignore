@@ -3,3 +3,6 @@
 dist/
 
 .DS_Store
+
+# Lokal MCP-konfiguration — pekar på annat på maskinen, hör inte till spelet.
+.mcp.json

@@ -113,11 +113,11 @@ export class Game {
     this.hud.showHUD(true);
     const adv = this.mode === 'adventure';
     if (checkpoint) {
-      this.hud.showBanner(`NIVÅ ${checkpoint.level + 1}`, 'du fortsätter från checkpointen', 3);
+      this.hud.showBanner(`LEVEL ${checkpoint.level + 1}`, 'you pick up where you left off', 3);
     } else if (this.worldId === 'city') {
-      this.hud.showBanner('NEOTROPOLIS', adv ? 'ge dig ut i staden' : 'håll mellanslag — flyg', 3);
+      this.hud.showBanner('NEOTROPOLIS', adv ? 'head out into the city' : 'hold space — fly', 3);
     } else {
-      this.hud.showBanner('VILDHEIM', adv ? 'ge dig ut på kartan' : 'vågorna kommer');
+      this.hud.showBanner('VILDHEIM', adv ? 'head out into the wild' : 'the waves are coming');
     }
     this.input.enabled = true;
     if (!this.input.touch) this.input.requestLock();
@@ -222,7 +222,7 @@ export class Game {
   announceBoss(e) {
     const city = this.worldId === 'city';
     const name = e.def.bossName || (city ? 'OVERSEER' : 'VOIDLORD');
-    const sub = e.def.bossSub || (city ? 'overseer aktiveras' : 'voidlord stiger upp');
+    const sub = e.def.bossSub || (city ? 'the overseer wakes' : 'the voidlord rises');
     this.hud.setBoss(e, name);
     this.hud.showBanner('BOSS', sub, 3);
     this.sound.bossSpawn();
@@ -248,7 +248,7 @@ export class Game {
     this.player.shake = Math.min(1.2, this.player.shake + (e.boss ? 1.0 : 0.12));
     if (e.boss) {
       this.hud.setBoss(null);
-      this.hud.showBanner('BOSSEN FÖLL', '', 2.6);
+      this.hud.showBanner('BOSS DOWN', '', 2.6);
       this.player.shake = 1.0;
     }
   }
@@ -274,7 +274,7 @@ export class Game {
     p.armor += n;
     this.sound.tone({ f: 300, f2: 520, dur: 0.16, type: 'triangle', vol: 0.10 });
     this.sound.tone({ f: 600, f2: 900, dur: 0.12, type: 'sine', vol: 0.06, delay: 0.05 });
-    this.toast(`🪖 Rustning ${p.armor}`);
+    this.toast(`🪖 Armour ${p.armor}`);
     this.particles.burst(p.pos.x, p.pos.y + 1.4, p.pos.z, 14, {
       speed: 6, life: 0.5, size: 0.4, size2: 0.05,
       col: [0.72, 0.82, 1.0], alpha: 0.9, drag: 0.6, grav: -3,
@@ -307,8 +307,8 @@ export class Game {
       shop: [...this.shopLevels],
     };
     try { localStorage.setItem('dashh.checkpoint', JSON.stringify(this.checkpoint)); } catch (e) { /* ignoreras */ }
-    this.hud.showBanner('CHECKPOINT', `nivå ${this.adventure.level} sparad`, 2.6);
-    this.toast(`Checkpoint: nivå ${this.adventure.level}`);
+    this.hud.showBanner('CHECKPOINT', `level ${this.adventure.level} saved`, 2.6);
+    this.toast(`Checkpoint: level ${this.adventure.level}`);
   }
 
   loadCheckpoint() {
@@ -391,30 +391,30 @@ export class Game {
   }
 
   onWaveStart(wave, isBoss) {
-    this.hud.showBanner(`VÅG ${wave}`, isBoss ? 'något stort närmar sig' : '');
+    this.hud.showBanner(`WAVE ${wave}`, isBoss ? 'something big is coming' : '');
     this.sound.waveStart();
   }
 
   onWaveClear(wave) {
-    this.hud.showBanner('VÅGEN RENSAD', 'nästa startar snart', 2.0);
-    this.toast(`Våg ${wave} klarad`);
+    this.hud.showBanner('WAVE CLEARED', 'next one starts shortly', 2.0);
+    this.toast(`Wave ${wave} cleared`);
     this.player.heal(this.player.stats.maxHp * 0.08);
   }
 
   // ------------------------------------------------------------- äventyret
 
   onLevelStart(level, isBoss, plan, mission) {
-    this.hud.showBanner(`NIVÅ ${level}`, mission ? mission.title.toLowerCase() : '', 2.6);
+    this.hud.showBanner(`LEVEL ${level}`, mission ? mission.title.toLowerCase() : '', 2.6);
     this.sound.waveStart();
-    if (level === 1) this.toast('Radarn visar uppdragsmålen — gula och blå prickar');
-    else if (plan.size === 'lång') this.toast('Stor karta den här gången');
+    if (level === 1) this.toast('The radar marks your objectives — gold and blue');
+    else if (plan.size === 'long') this.toast('A big map this time');
   }
 
   onLevelClear(level) {
     const reward = 60 + level * 25;
     this.addGold(reward);
     this.levelReward = reward;
-    this.hud.showBanner('NIVÅ KLARAD', `+${reward} guld`, 2.4);
+    this.hud.showBanner('LEVEL CLEARED', `+${reward} gold`, 2.4);
     this.sound.levelUp();
     this.player.heal(this.player.stats.maxHp * 0.15);
     this.interludeT = 2.0;      // en andhämtning innan shoppen
@@ -422,7 +422,7 @@ export class Game {
 
   /** Uppdraget gick om intet — nivån görs om från början. */
   onLevelFailed(level, mission) {
-    this.hud.showBanner('UPPDRAGET MISSLYCKADES', '', 2.4);
+    this.hud.showBanner('MISSION FAILED', '', 2.4);
     this.sound.gameOver();
     this.state = 'failed';
     this.input.enabled = false;

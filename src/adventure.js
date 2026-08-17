@@ -36,12 +36,12 @@ export class AdventureManager {
    */
   makePlan(level, type) {
     if (type === 'boss') return { size: 'boss', camps: 2, budget: 5 + level * 1.5 };
-    if (type === 'defend') return { size: 'kort', camps: 2, budget: 6 + level * 1.4 };
-    if (type === 'escort') return { size: 'lång', camps: 3, budget: 9 + level * 2.2 };
+    if (type === 'defend') return { size: 'short', camps: 2, budget: 6 + level * 1.4 };
+    if (type === 'escort') return { size: 'long', camps: 3, budget: 9 + level * 2.2 };
     const r = Math.random();
-    if (r < 0.30) return { size: 'kort', camps: 2, budget: 5 + level * 1.7 };
-    if (r < 0.75) return { size: 'vanlig', camps: 4, budget: 8 + level * 2.3 };
-    return { size: 'lång', camps: 6, budget: 11 + level * 3.0 };
+    if (r < 0.30) return { size: 'short', camps: 2, budget: 5 + level * 1.7 };
+    if (r < 0.75) return { size: 'normal', camps: 4, budget: 8 + level * 2.3 };
+    return { size: 'long', camps: 6, budget: 11 + level * 3.0 };
   }
 
   /** Monsterlista för ett läger, prisad så svårare typer blir färre. */
@@ -190,7 +190,7 @@ export class AdventureManager {
         e.wake(ctx);
         e.enrage = true;
       }
-      ctx.toast('Allt som lever söker upp dig');
+      ctx.toast('Everything still alive is coming for you');
     }
   }
 }

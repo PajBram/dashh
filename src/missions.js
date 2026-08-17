@@ -11,9 +11,9 @@ const CYAN = [0.30, 0.95, 1.0];
 const GREEN = [0.35, 1.0, 0.62];
 
 /** Namn åt jaktens byte — sätts ihop av två halvor. */
-const HUNT_FIRST = ['Gorrn', 'Vex', 'Malak', 'Sköldbjörn', 'Kavr', 'Thume', 'Zerrik', 'Ödesgap'];
-const HUNT_LAST = ['Benkross', 'den Svultne', 'Askhjärta', 'Tvillingtand', 'den Blinde',
-  'Järnkäft', 'Nattfäll', 'den Förste'];
+const HUNT_FIRST = ['Gorrn', 'Vex', 'Malak', 'Shieldbear', 'Kavr', 'Thume', 'Zerrik', 'Doomjaw'];
+const HUNT_LAST = ['Bonebreaker', 'the Starved', 'Ashheart', 'Twintooth', 'the Blind',
+  'Ironmaw', 'Nightfall', 'the First'];
 
 class Mission {
   constructor(level) {
@@ -35,8 +35,8 @@ class Mission {
 class CollectMission extends Mission {
   constructor(level, ctx, mgr) {
     super(level);
-    this.title = 'SAMLA KRAFTKÄRNORNA';
-    this.label = 'KRAFTKÄRNOR';
+    this.title = 'COLLECT THE POWER CORES';
+    this.label = 'POWER CORES';
     const n = level < 4 ? 3 : 4;
     this.cores = [];
     const budget = mgr.plan.budget / n;
@@ -64,7 +64,7 @@ class CollectMission extends Mission {
           speed: 9, life: 0.8, size: 0.5, size2: 0.05, col: GOLD, alpha: 0.95, drag: 0.6, grav: -4,
         });
         const left = this.cores.length - this.taken;
-        ctx.toast(left ? `Kraftkärna tagen — ${left} kvar` : 'Sista kraftkärnan!');
+        ctx.toast(left ? `Core taken — ${left} to go` : 'The last core!');
         if (!left) this.done = true;
       }
     }
@@ -100,8 +100,8 @@ class CollectMission extends Mission {
 class DefendMission extends Mission {
   constructor(level, ctx, mgr) {
     super(level);
-    this.title = 'FÖRSVARA REAKTORN';
-    this.label = 'LADDNING';
+    this.title = 'DEFEND THE REACTOR';
+    this.label = 'CHARGE';
     const spot = mgr.campSpot(ctx, 46, ARENA_RADIUS - 24);
     this.x = spot.x; this.z = spot.z; this.y = terrainHeight(spot.x, spot.z);
     this.charge = 0;
@@ -116,7 +116,7 @@ class DefendMission extends Mission {
   }
 
   get status() {
-    if (!this.started) return 'GÅ DIT';
+    if (!this.started) return 'GET THERE';
     return `${Math.round(this.charge * 100)} %`;
   }
 
@@ -128,7 +128,7 @@ class DefendMission extends Mission {
       if (d < 14) {
         this.started = true;
         this.spawnT = 3;
-        ctx.hud.showBanner('REAKTORN LADDAR', 'håll dig kvar', 2.4);
+        ctx.hud.showBanner('REACTOR CHARGING', 'stay close', 2.4);
         ctx.sound.waveStart();
       }
       return;
@@ -141,7 +141,7 @@ class DefendMission extends Mission {
       this.charge = Math.max(0, this.charge - dt * 0.35 / this.dur);
       if (!this.warnT || this.warnT <= 0) {
         this.warnT = 3.5;
-        ctx.toast('Reaktorn tappar laddning — gå tillbaka');
+        ctx.toast('The reactor is losing charge — get back');
       }
     }
     if (this.warnT > 0) this.warnT -= dt;
@@ -206,7 +206,7 @@ class HuntMission extends Mission {
   constructor(level, ctx, mgr) {
     super(level);
     this.name = `${HUNT_FIRST[randInt(0, HUNT_FIRST.length - 1)]} ${HUNT_LAST[randInt(0, HUNT_LAST.length - 1)]}`;
-    this.title = 'SPÅRA UPP MÅLET';
+    this.title = 'HUNT THE TARGET';
     this.label = this.name.toUpperCase();
 
     // ett par vanliga läger, och längst bort lägret där bytet håller till
@@ -234,7 +234,7 @@ class HuntMission extends Mission {
 
   get status() {
     const t = this.target;
-    if (!t.alive) return 'FÄLLD';
+    if (!t.alive) return 'DOWN';
     return `${Math.max(0, Math.round(t.hp / t.maxHp * 100))} %`;
   }
 
@@ -244,14 +244,14 @@ class HuntMission extends Mission {
       if (!this.done) {
         this.done = true;
         ctx.hud.setBoss(null);
-        ctx.hud.showBanner('MÅLET FÄLLT', this.name, 2.4);
+        ctx.hud.showBanner('TARGET DOWN', this.name, 2.4);
       }
       return;
     }
     if (!this.announced && !t.guard) {
       this.announced = true;
       ctx.hud.setBoss(t, this.name.toUpperCase());
-      ctx.hud.showBanner(this.name.toUpperCase(), 'har fått syn på dig', 2.6);
+      ctx.hud.showBanner(this.name.toUpperCase(), 'has spotted you', 2.6);
       ctx.sound.bossSpawn();
     }
   }
@@ -274,8 +274,8 @@ class HuntMission extends Mission {
 class EscortMission extends Mission {
   constructor(level, ctx, mgr) {
     super(level);
-    this.title = 'ESKORTERA LASTAREN';
-    this.label = 'LASTAREN';
+    this.title = 'ESCORT THE HAULER';
+    this.label = 'HAULER';
 
     const p = ctx.player.pos;
     const a = rand(TAU);
@@ -347,7 +347,7 @@ class EscortMission extends Mission {
           size: rand(0.2, 0.45), size2: 0, col: [1.0, 0.45, 0.2], alpha: 0.9, drag: 0.5,
         });
       }
-      if (!this.hurtT || this.hurtT <= 0) { this.hurtT = 4; ctx.toast('Lastaren är under attack!'); }
+      if (!this.hurtT || this.hurtT <= 0) { this.hurtT = 4; ctx.toast('The hauler is under attack!'); }
     } else if (this.hp < this.maxHp) {
       this.hp = Math.min(this.maxHp, this.hp + 12 * dt);
     }
@@ -405,8 +405,8 @@ class EscortMission extends Mission {
 class BossMission extends Mission {
   constructor(level, ctx, mgr) {
     super(level);
-    this.title = 'NÅGOT VÄNTAR DÄR UTE';
-    this.label = 'BOSSEN';
+    this.title = 'SOMETHING WAITS OUT THERE';
+    this.label = 'THE BOSS';
     for (let i = 0; i < mgr.plan.camps; i++) {
       mgr.spawnCamp(ctx, mgr.campSpot(ctx, 48, ARENA_RADIUS - 14), mgr.plan.budget / mgr.plan.camps);
     }
@@ -420,8 +420,8 @@ class BossMission extends Mission {
 
   get status() {
     const t = this.target;
-    if (!t.alive) return 'FÄLLD';
-    return t.guard ? 'HITTA DEN' : `${Math.max(0, Math.round(t.hp / t.maxHp * 100))} %`;
+    if (!t.alive) return 'DOWN';
+    return t.guard ? 'FIND IT' : `${Math.max(0, Math.round(t.hp / t.maxHp * 100))} %`;
   }
 
   update(dt, ctx) {

@@ -6,10 +6,14 @@ på <https://rastegar.se/games/dashh/>. Källkoden: <https://github.com/PajBram/
 **Ägare:** Paj (pajam98@hotmail.com). **Inte utvecklare** — förklara tekniska val
 i klarspråk på svenska och säg tydligt till när Paj behöver göra något själv.
 
-**Språk:** svenska överallt — mot Paj, i spelets gränssnitt, i kodkommentarer och
-i den här filen. Commit-meddelanden på engelska. Att spelet är svenskt medan
-rastegar.se i övrigt är engelsk är ett medvetet beslut, dokumenterat i sajtens
-egen CLAUDE.md. **Översätt inte spelet.**
+**Språk:** svenska mot Paj, i kodkommentarer och i den här filen.
+Commit-meddelanden på engelska.
+
+**Spelets gränssnitt är engelskt sedan 2026-08-17** — allt spelaren ser:
+menyer, HUD, uppdrag, shop, banderoller, toasts, bossnamn och felmeddelanden.
+Det var tidigare svenskt, och det beslutet är omvänt på Pajs begäran (sajten
+är engelsk i övrigt). Lägger du till ny text som spelaren ser: **skriv den på
+engelska direkt**, men kommentera koden på svenska som förut.
 
 ---
 

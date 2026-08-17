@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="sv">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
@@ -306,16 +306,16 @@
 
 <div id="hud" class="hidden">
   <div class="topbar">
-    <div class="stat"><span class="label" id="waveLbl">VÅG</span><span id="waveNum">1</span></div>
-    <div class="stat"><span class="label" id="levelLbl">NIVÅ</span><span id="levelNum">1</span></div>
-    <div class="stat hidden" id="goldStat"><span class="label">GULD</span><span id="goldNum">0</span></div>
+    <div class="stat"><span class="label" id="waveLbl">WAVE</span><span id="waveNum">1</span></div>
+    <div class="stat"><span class="label" id="levelLbl">LEVEL</span><span id="levelNum">1</span></div>
+    <div class="stat hidden" id="goldStat"><span class="label">GOLD</span><span id="goldNum">0</span></div>
     <div class="stat"><span class="label">KILLS</span><span id="killNum">0</span></div>
-    <div class="stat"><span class="label">TID</span><span id="timeNum">0:00</span></div>
+    <div class="stat"><span class="label">TIME</span><span id="timeNum">0:00</span></div>
     <div class="stat"><span class="label">FPS</span><span id="fpsNum">—</span></div>
   </div>
 
   <div id="objective" class="hidden">
-    <span id="objLabel">UPPDRAG</span><span id="objValue">—</span>
+    <span id="objLabel">OBJECTIVE</span><span id="objValue">—</span>
   </div>
 
   <div id="bossBar" class="hidden">
@@ -336,7 +336,7 @@
       <span id="armTag" class="hidden">🪖 0</span></div>
     <div class="bar xp"><div id="xpFill"></div></div>
     <div id="dashRow"></div>
-    <div id="fireRow" class="hidden"><div id="fireFill"></div><span>C · ELDBOLL</span></div>
+    <div id="fireRow" class="hidden"><div id="fireFill"></div><span>C · FIREBALL</span></div>
     <div id="comboRow" class="hidden"><i></i><i></i><i></i></div>
   </div>
 
@@ -359,11 +359,11 @@
   window.addEventListener('error', function (e) {
     if (e && e.target && e.target.tagName === 'SCRIPT') {
       document.getElementById('overlay').innerHTML =
-        '<div class="screen"><div class="goTitle">KUNDE INTE LADDA</div>' +
-        '<p id="loadErr">Spelet består av ES-moduler och måste serveras över http.' +
-        ' Kör <code>python3 -m http.server</code> i spelmappen och öppna' +
-        ' <code>http://localhost:8000</code> — eller använd enfilsversionen' +
-        ' <code>dist/dashh.html</code> som fungerar att öppna direkt.</p></div>';
+        '<div class="screen"><div class="goTitle">COULD NOT LOAD</div>' +
+        '<p id="loadErr">The game is built from ES modules and has to be served over http.' +
+        ' Run <code>python3 -m http.server</code> in the game folder and open' +
+        ' <code>http://localhost:8000</code> — or use the single-file build' +
+        ' <code>dist/dashh.html</code>, which opens straight from disk.</p></div>';
     }
   }, true);
 </script>

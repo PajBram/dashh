@@ -15,8 +15,8 @@ export const TYPES = {
   hover:  { hp: 155, speed: 3.4,  radius: 1.90, height: 2.0, dmg: 20, xp: 17, col: [0.55, 0.60, 1.00], ai: 'hover', turn: 0.8, cool: 2.4, bullet: 32, shield: true },
 
   // --- Äventyrets egna bossar: en per värld, med faser vid 2/3 och 1/3 hälsa
-  vildboss: { hp: 760, speed: 3.1, radius: 2.40, height: 5.2, dmg: 30, xp: 120, col: [0.50, 0.53, 0.40], ai: 'vildboss', cool: 1.4, bullet: 22, boss: true, bossName: 'JORDVREDET', bossSub: 'marken reser sig' },
-  cityboss: { hp: 660, speed: 6.2, radius: 2.10, height: 2.6, dmg: 26, xp: 120, col: [0.90, 0.94, 1.00], ai: 'cityboss', cool: 1.3, bullet: 34, boss: true, bossName: 'SANERAREN', bossSub: 'staden städar undan dig', turn: 3 },
+  vildboss: { hp: 760, speed: 3.1, radius: 2.40, height: 5.2, dmg: 30, xp: 120, col: [0.50, 0.53, 0.40], ai: 'vildboss', cool: 1.4, bullet: 22, boss: true, bossName: 'THE EARTHWRATH', bossSub: 'the ground rises' },
+  cityboss: { hp: 660, speed: 6.2, radius: 2.10, height: 2.6, dmg: 26, xp: 120, col: [0.90, 0.94, 1.00], ai: 'cityboss', cool: 1.3, bullet: 34, boss: true, bossName: 'THE SANITISER', bossSub: 'the city clears you away', turn: 3 },
 };
 
 // Neotropolis-varianternas neonskal.
@@ -420,7 +420,7 @@ export class Enemy {
       case 'vildboss': {
         // Jordvredet: stenjätte. Kastar bumlingar i båge på håll, stampar
         // marken på nära håll. Varje fas gör den snabbare och kasten fler.
-        const ph = this.updateBossPhase(ctx, 'Jordvredet rämnar', 'Jordvredet rasar');
+        const ph = this.updateBossPhase(ctx, 'The Earthwrath splits open', 'The Earthwrath rages');
         const hurry = 1 + (ph - 1) * 0.25;
         if (this.state === 'stomp') {
           speed = 0;
@@ -463,7 +463,7 @@ export class Enemy {
       case 'cityboss': {
         // Saneraren: svävande ringmaskin. Cirklar runt spelaren, fäller ut
         // solfjädrar av skott, och blinkar till ny vinkel i senare faser.
-        const ph = this.updateBossPhase(ctx, 'Saneraren eskalerar', 'Saneraren renar');
+        const ph = this.updateBossPhase(ctx, 'The Sanitiser escalates', 'The Sanitiser purges');
         const ring = 15;
         if (this.state === 'sweep') {
           speed = this.speed * 0.15;
@@ -1073,7 +1073,7 @@ export class WaveManager {
       if (this.clearT > 12 && !this.enraged) {
         this.enraged = true;
         for (const e of ctx.enemies) if (e.alive) e.enrage = true;
-        ctx.toast('Eftersläntrare jagar dig');
+        ctx.toast('The stragglers are hunting you');
       }
       if (this.clearT > 26) {
         this.state = 'idle';
