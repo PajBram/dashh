@@ -187,6 +187,20 @@ export class Sound {
     this.tone({ f: 105, f2: 60, dur: 1.6, type: 'square', vol: 0.10, delay: 0.1 });
     this.noise({ dur: 1.4, vol: 0.12, freq: 260, sweep: 60, q: 0.4 });
   }
+  /** Parering: skarp metallklang med efterklang — ska höras genom allt annat. */
+  parry() {
+    const v = this.v(0.05);
+    this.tone({ f: 2400 * v, f2: 1500 * v, dur: 0.10, type: 'square', vol: 0.10 });
+    this.tone({ f: 3300 * v, f2: 2100 * v, dur: 0.22, type: 'triangle', vol: 0.06, delay: 0.01 });
+    this.tone({ f: 300 * v, f2: 150 * v, dur: 0.12, type: 'sine', vol: 0.08 });
+    this.noise({ dur: 0.14, vol: 0.08, freq: 5200, q: 1.4, type: 'highpass' });
+  }
+
+  /** Parering som slog i tomma luften — kort, matt, ingen klang. */
+  parryMiss() {
+    this.noise({ dur: 0.12, vol: 0.06, freq: 900, sweep: 300, q: 0.9 });
+  }
+
   /** Åska. far 0 = strax intill och skarpt, 1 = långt bort och dovt. */
   thunder(far = 0.5) {
     const delay = far * 2.6;            // ljudet hinner ifatt ljuset

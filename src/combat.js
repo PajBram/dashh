@@ -237,6 +237,48 @@ export class Combat {
     else ctx.sound.tone({ f: 900, f2: 420, dur: 0.06, type: 'triangle', vol: 0.05 });
   }
 
+  /**
+   * Slår tillbaka ett fiendeskott. Det blir spelarens projektil: dubbel skada,
+   * riktad mot närmaste fiende. Missar man alla står den kvar och flyger dit
+   * man tittade — en parering utan mål ska ändå kännas som en parering.
+   */
+  reflectBullet(ctx, b, index) {
+    const p = ctx.player;
+    let target = null, best = 60;
+    for (const e of ctx.enemies) {
+      if (!e.alive) continue;
+      const d = Math.hypot(e.pos.x - b.x, e.pos.z - b.z);
+      if (d < best) { best = d; target = e; }
+    }
+    let dx, dy, dz;
+    if (target) {
+      dx = target.pos.x - b.x;
+      dy = (target.pos.y + target.height * 0.5) - b.y;
+      dz = target.pos.z - b.z;
+    } else {
+      const aim = p.aimDir(ctx.enemies);
+      dx = aim.x; dy = aim.y; dz = aim.z;
+    }
+    const l = Math.hypot(dx, dy, dz) || 1;
+    const speed = 70;
+    this.shots.push({
+      x: b.x, y: b.y, z: b.z,
+      vx: (dx / l) * speed, vy: (dy / l) * speed, vz: (dz / l) * speed,
+      life: 2.0, dmg: b.dmg * 2, crit: true,
+      pierce: 1, radius: 0.7, explosive: 0, hits: new Set(),
+      col: [1.0, 0.92, 0.55],
+    });
+    this.bullets.splice(index, 1);
+
+    p.parryFlash = 1;
+    ctx.freeze(0.07);
+    ctx.sound.parry();
+    ctx.particles.burst(b.x, b.y, b.z, 18, {
+      speed: 11, life: 0.4, size: 0.6, size2: 0.05,
+      col: [1.0, 0.95, 0.6], alpha: 1, drag: 0.7,
+    });
+  }
+
   // ------------------------------------------------------------ fiendeskott
 
   enemyBullet(e, target, speed, dmg) {
@@ -428,6 +470,16 @@ export class Combat {
       b.life -= dt;
       b.vy -= 3.2 * dt;
       b.x += b.vx * dt; b.y += b.vy * dt; b.z += b.vz * dt;
+      /*
+       * Parering: under det öppna fönstret slås inkommande skott tillbaka mot
+       * den närmaste fienden i stället för att träffa. Räckvidden är generös
+       * (3,4 m) och gäller runtom, inte bara framåt — pareringen ska belöna
+       * tajming, inte kräva att man dessutom står vänd åt rätt håll.
+       */
+      if (p.parryTime > 0 && !b.parried) {
+        const pd = Math.hypot(b.x - p.pos.x, b.y - (p.pos.y + 1.1), b.z - p.pos.z);
+        if (pd < 3.4) { this.reflectBullet(ctx, b, i); continue; }
+      }
       const hitPlayer = Math.hypot(b.x - p.pos.x, b.y - (p.pos.y + 1.1), b.z - p.pos.z) < b.radius + p.radius + 0.35;
       if (hitPlayer) {
         if (p.takeDamage(b.dmg)) {

@@ -31,8 +31,8 @@ const CORE = [
     apply: (st) => { st.fireRateBonus += 0.15; } },
 
   { id: 'hp', name: 'PLATING', icon: '🛡️', max: 6,
-    desc: '+30 max HP, heals 30',
-    apply: (st, p) => { st.maxHp += 30; p.heal(30); } },
+    desc: '+20 max HP, heals 20',
+    apply: (st, p) => { st.maxHp += 20; p.heal(20); } },
 
   { id: 'speed', name: 'SERVO LEGS', icon: '🥾', max: 5,
     desc: '+10% movement speed',
@@ -46,9 +46,11 @@ const CORE = [
     desc: '−20% dash cooldown',
     apply: (st) => { st.dashRecharge *= 0.8; } },
 
+  // Regenen ligger nere i fyra sekunder efter varje träff (se player.js),
+  // så det här är läkning MELLAN strider. Höj den inte utan att tänka på det.
   { id: 'regen', name: 'MENDING', icon: '💚', max: 5,
-    desc: '+1.2 HP per second',
-    apply: (st) => { st.regen += 1.2; } },
+    desc: '+0.7 HP per second, out of combat',
+    apply: (st) => { st.regen += 0.7; } },
 
   { id: 'magnet', name: 'MAGNET FIELD', icon: '🧲', max: 4,
     desc: '+70% pickup radius',

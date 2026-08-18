@@ -59,6 +59,14 @@
   #fireRow span{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
     font-size:9px;letter-spacing:.18em;font-weight:700;text-shadow:0 1px 2px #000}
   #fireRow.ready{box-shadow:0 0 16px rgba(255,150,60,.7)}
+  #parryRow{position:relative;height:15px;width:150px;margin:5px auto 0;border-radius:8px;
+    overflow:hidden;background:rgba(4,8,16,.75);border:1px solid rgba(120,200,255,.4)}
+  #parryFill{position:absolute;inset:0;transform-origin:left center;transform:scaleX(0);
+    background:linear-gradient(90deg,#4dc3ff,#9ff0ff)}
+  #parryRow span{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+    font-size:9px;letter-spacing:.14em;font-weight:700;text-shadow:0 1px 2px #000}
+  #parryRow.ready{box-shadow:0 0 14px rgba(120,200,255,.6)}
+  #parryRow.hidden{display:none}
   #comboRow{display:flex;gap:7px;justify-content:center;margin-top:7px}
   #comboRow i{width:12px;height:12px;border-radius:50%;background:rgba(255,255,255,.12);
     border:1px solid rgba(255,180,90,.3);transition:transform .1s}
@@ -147,6 +155,10 @@
     border-color:rgba(255,150,60,.5)}
   .tBtn--fire.cool{opacity:.35}
   .tBtn--fire.hidden{display:none}
+  .tBtn--parry{right:170px;bottom:60px;width:62px;height:62px;font-size:22px;
+    border-color:rgba(120,200,255,.55)}
+  .tBtn--parry.cool{opacity:.35}
+  .tBtn--parry.hidden{display:none}
 
   /* HUD:en krymper och flyttar ihop sig på en telefon */
   @media (max-width:760px){
@@ -257,6 +269,12 @@
     background:linear-gradient(180deg,rgba(20,26,44,.95),rgba(10,13,24,.95));
     border:1px solid var(--line);text-align:center;position:relative;
     transition:transform .14s,border-color .14s,box-shadow .14s}
+  /* markerat kort: tydligt vald, väntar på bekräftelse */
+  .card.picked{border-color:var(--gold);box-shadow:0 0 0 2px var(--gold),0 14px 44px rgba(255,204,77,.35);
+    transform:translateY(-6px)}
+  .card.picked .name{color:var(--gold)}
+  .cta[disabled]{opacity:.4;cursor:default;filter:grayscale(.6)}
+  .cta[disabled]:hover{transform:none;box-shadow:0 0 40px rgba(77,243,255,.45)}
   .card:hover{transform:translateY(-6px);border-color:var(--neon);
     box-shadow:0 14px 40px rgba(77,243,255,.28)}
   .card .icon{font-size:38px;line-height:1;margin-bottom:10px}
@@ -337,13 +355,15 @@
     <div class="bar xp"><div id="xpFill"></div></div>
     <div id="dashRow"></div>
     <div id="fireRow" class="hidden"><div id="fireFill"></div><span>C · FIREBALL</span></div>
+    <div id="parryRow" class="hidden"><div id="parryFill"></div><span>RIGHT CLICK · PARRY</span></div>
     <div id="comboRow" class="hidden"><i></i><i></i><i></i></div>
   </div>
 
   <div id="touchUI">
     <div id="stick"><i id="knob"></i></div>
     <div id="tPad">
-      <button id="tFire" class="tBtn tBtn--fire" data-key="KeyC" aria-label="Eldboll">🔥</button>
+      <button id="tFire" class="tBtn tBtn--fire" data-key="KeyC" aria-label="Fireball">🔥</button>
+      <button id="tParry" class="tBtn tBtn--parry" data-key="KeyQ" aria-label="Parry">🛡</button>
       <button class="tBtn tBtn--jump" data-key="Space" aria-label="Hoppa">▲</button>
       <button class="tBtn tBtn--dash" data-key="ShiftLeft" aria-label="Dash">DASH</button>
       <button class="tBtn tBtn--atk" data-attack aria-label="Attack">ATK</button>

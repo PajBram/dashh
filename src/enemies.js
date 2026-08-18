@@ -42,7 +42,7 @@ export class Enemy {
     const hpMul = 1 + (wave - 1) * 0.25 + (wave > 10 ? (wave - 10) * 0.10 : 0);
     this.maxHp = Math.round(t.hp * hpMul);
     this.hp = this.maxHp;
-    this.dmg = t.dmg * (1 + (wave - 1) * 0.09);
+    this.dmg = t.dmg * (1 + (wave - 1) * 0.11);
     this.speed = t.speed * (1 + Math.min(0.45, (wave - 1) * 0.022));
     // Neotropolis maskiner är byggda större än Vildheims djur. Skalan sitter
     // här så att träffytan, höjden och modellen växer i takt — skalar man

@@ -118,6 +118,11 @@ Fullscreen sköts av sajtens egen `static/js/fullscreen.js` — bygg ingen egen.
   samma stund nivån börjar och rusar mot spelaren — och då är kartan inte en
   karta, bara en våg som råkade starta längre bort. Det hände i första försöket
   2026-08-14.
+- **Regenen ligger nere 4 s efter varje träff** (`REGEN_DELAY` i `player.js`).
+  Utan den pausen tickar den mitt i striden, och sent i en körning tålde
+  spelaren 42 träffar och läkte igen var och en på tre sekunder — man kunde
+  knappt dö. Regenen ska läka *mellan* strider; livstöld är vägen till
+  läkning *under* dem, och den kräver att man träffar något.
 - **Rustningen har inget tak, och ska inte få det.** Dämpningen är
   `skada / (1 + rustning * 0.06)` — avtagande, så nivå 50 ger 75 % och nivå
   100 ger 86 %, men aldrig odödlighet. Byt inte till procent per nivå: då blir
@@ -177,6 +182,13 @@ Fullscreen sköts av sajtens egen `static/js/fullscreen.js` — bygg ingen egen.
   exakt samma skäl som drönarnas: utan den spiralar den in rakt över
   spelaren där siktet inte når. Uppmätt 23–27 m och ≤6° höjdvinkel — håll
   det så.
+- **Pareringen är bara Vildheims** (höger musknapp eller Q, `tryParry`).
+  Fönstret är 0,28 s och återladdningen 0,85 s — en miss kostar ändå sin
+  cooldown, annars vore det gratis att hålla knappen intryckt. Träffar den
+  blir fiendeskottet spelarens projektil med dubbel skada.
+- **Nivå-upp kräver två tryck**: markera kort, sedan bekräfta. Skärmen slår
+  upp mitt i striden medan man redan klickar för att attackera, och med ett
+  enda steg valdes kortet under pekaren innan man hunnit läsa något.
 - **Vapnen låter olika.** Svärdet har låg duns + metallklang, lasern torrt
   högpassat knäpp utan bas, och båda varierar några procent i tonhöjd. Slå inte
   ihop dem till ett gemensamt träffljud igen — det var så det lät förut och det

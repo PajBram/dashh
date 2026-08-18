@@ -31,6 +31,9 @@ export class HUD {
     this.toasts = $('toasts');
     this.fireRow = $('fireRow');
     this.fireFill = $('fireFill');
+    this.parryRow = $('parryRow');
+    this.parryFill = $('parryFill');
+    this.tParry = $('tParry');
     this.comboRow = $('comboRow');
     this.comboPips = [...this.comboRow.children];
     this.cross = $('crosshair');
@@ -195,6 +198,8 @@ export class HUD {
       const wild = g.worldId === 'wild';
       this.tFire.classList.toggle('hidden', !wild);
       if (wild) this.tFire.classList.toggle('cool', p.fireballCd > 0);
+      this.tParry.classList.toggle('hidden', !wild);
+      if (wild) this.tParry.classList.toggle('cool', p.parryCd > 0);
     }
     const cx = free ? (inp.cursorNX * 0.5 + 0.5) * 100 : 50;
     const cy = free ? (inp.cursorNY * 0.5 + 0.5) * 100 : 50;
@@ -235,6 +240,12 @@ export class HUD {
       this.fireFill.style.transform = `scaleX(${frac})`;
       this.fireRow.classList.toggle('ready', frac >= 1);
 
+      // pareringens återladdning, med samma språk som eldbollen
+      this.parryRow.classList.remove('hidden');
+      const pf = 1 - clamp(p.parryCd / 0.85, 0, 1);
+      this.parryFill.style.transform = `scaleX(${pf})`;
+      this.parryRow.classList.toggle('ready', pf >= 1);
+
       this.comboRow.classList.remove('hidden');
       const hits = p.comboTimer > 0 ? p.combo + 1 : 0;
       for (let i = 0; i < 3; i++) {
@@ -245,6 +256,7 @@ export class HUD {
       }
     } else {
       this.fireRow.classList.add('hidden');
+      this.parryRow.classList.add('hidden');
       this.comboRow.classList.add('hidden');
     }
 
@@ -527,6 +539,14 @@ export class HUD {
     $('btnNext').addEventListener('click', onContinue);
   }
 
+  /**
+   * Nivå-upp i två steg: först markera ett kort, sedan bekräfta.
+   *
+   * Ett steg räckte tekniskt, men skärmen slår upp mitt i striden medan man
+   * redan klickar för att attackera — och då valdes kortet under pekaren av
+   * misstag innan man hunnit läsa något. Nu kostar valet ett medvetet andra
+   * tryck, och ångrar man sig markerar man bara ett annat kort.
+   */
   showLevelUp(level, choices, onPick) {
     const cards = choices.map((u, i) => `
       <div class="card" data-i="${i}">
@@ -540,11 +560,34 @@ export class HUD {
         <div class="lvlTitle">LEVEL ${level}</div>
         <div class="lvlSub">CHOOSE AN UPGRADE</div>
         <div class="cards">${cards}</div>
-        <div class="hint">click, or press 1 · 2 · 3</div>
+        <button class="cta" id="btnConfirm" disabled>PICK ONE FIRST</button>
+        <div class="hint">1 · 2 · 3 to select · click it again or press enter to take it</div>
       </div>`);
-    this.overlay.querySelectorAll('.card').forEach((el) => {
-      el.addEventListener('click', () => onPick(+el.dataset.i));
-    });
+
+    this.lvlSelected = -1;
+    const btn = $('btnConfirm');
+    const els = [...this.overlay.querySelectorAll('.card')];
+
+    this.selectUpgrade = (i) => {
+      if (i < 0 || i >= els.length) return;
+      // andra trycket på ett redan markerat kort tar det
+      if (this.lvlSelected === i) { this.confirmUpgrade(); return; }
+      this.lvlSelected = i;
+      els.forEach((el, k) => el.classList.toggle('picked', k === i));
+      btn.disabled = false;
+      btn.textContent = `TAKE ${choices[i].name}`;
+    };
+    this.confirmUpgrade = () => {
+      if (this.lvlSelected < 0) return;
+      const i = this.lvlSelected;
+      this.lvlSelected = -1;
+      this.selectUpgrade = null;
+      this.confirmUpgrade = null;
+      onPick(i);
+    };
+
+    els.forEach((el) => el.addEventListener('click', () => this.selectUpgrade(+el.dataset.i)));
+    btn.addEventListener('click', () => this.confirmUpgrade && this.confirmUpgrade());
   }
 
   showPause(onResume) {

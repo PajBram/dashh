@@ -595,6 +595,20 @@ export class Game {
       else this.combat.playerShoot(this);
     } else p.aimDir(this.enemies);
 
+    /*
+     * Parering på höger musknapp (eller Q). Bara i Vildheim: där möter man
+     * spottare och bossar som kastar saker, och man har ett svärd att slå
+     * tillbaka med. I Neotropolis flyger man undan i stället.
+     */
+    if (this.worldId === 'wild' && (this.input.parryPressed || this.input.pressed('KeyQ'))) {
+      if (p.tryParry()) {
+        this.sound.parryMiss();
+        this.particles.burst(p.pos.x, p.pos.y + 1.3, p.pos.z, 10, {
+          speed: 5, life: 0.25, size: 0.4, col: [0.8, 0.9, 1.0], alpha: 0.7, drag: 0.8,
+        });
+      }
+    }
+
     // eldboll på C (bara Vildheim, 10 s nedkylning)
     if (this.worldId === 'wild' && this.input.pressed('KeyC') && p.alive) {
       if (p.fireballCd <= 0) this.combat.castFireball(this);
@@ -751,12 +765,16 @@ export class Game {
       if (this.input.pressed('Space') || this.input.pressed('Enter')) this.continueRun();
       this.particles.update(dt * 0.25);
     } else if (this.state === 'levelup') {
+      // Siffrorna markerar, enter tar. Samma två steg som med musen, så ett
+      // reflexmässigt tryck mitt i striden inte kan välja åt en.
       for (let i = 0; i < 3; i++) {
         if (this.input.pressed(`Digit${i + 1}`) || this.input.pressed(`Numpad${i + 1}`)) {
-          this.pickUpgrade(i);
+          if (this.hud.selectUpgrade) this.hud.selectUpgrade(i);
           break;
         }
       }
+      if ((this.input.pressed('Enter') || this.input.pressed('NumpadEnter')
+        || this.input.pressed('Space')) && this.hud.confirmUpgrade) this.hud.confirmUpgrade();
       this.particles.update(dt * 0.25);
     } else {
       // meny eller game over: låt världen leva vidare i bakgrunden

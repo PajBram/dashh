@@ -15,6 +15,8 @@ export class Input {
     this.cursorNY = 0;
     this.wheel = 0;
     this.fireDown = false;
+    this.parryDown = false;      // höger musknapp: parering i Vildheim
+    this.parryPressed = false;   // bara bildrutan då den trycktes ner
     this.locked = false;
     this.sensitivity = 0.0022;
     this.enabled = true;
@@ -25,7 +27,9 @@ export class Input {
       this.keys.add(e.code);
     });
     addEventListener('keyup', (e) => this.keys.delete(e.code));
-    addEventListener('blur', () => { this.keys.clear(); this.fireDown = false; });
+    addEventListener('blur', () => {
+      this.keys.clear(); this.fireDown = false; this.parryDown = false;
+    });
 
     canvas.addEventListener('mousemove', (e) => {
       if (!this.enabled) return;
@@ -41,9 +45,16 @@ export class Input {
     });
     canvas.addEventListener('mousedown', (e) => {
       if (e.button === 0) this.fireDown = true;
+      // Högerknappen pareras med. `parryPressed` nollställs i endFrame, så
+      // ett tryck ger exakt en parering hur länge man än håller inne.
+      if (e.button === 2) {
+        if (!this.parryDown) this.parryPressed = true;
+        this.parryDown = true;
+      }
     });
     addEventListener('mouseup', (e) => {
       if (e.button === 0) this.fireDown = false;
+      if (e.button === 2) this.parryDown = false;
     });
     canvas.addEventListener('contextmenu', (e) => e.preventDefault());
     canvas.addEventListener('wheel', (e) => { e.preventDefault(); this.wheel += e.deltaY; }, { passive: false });
@@ -192,6 +203,7 @@ export class Input {
   /** Nollställ engångsvärden i slutet av varje bildruta. */
   endFrame() {
     this.justPressed.clear();
+    this.parryPressed = false;
     this.mouseDX = 0;
     this.mouseDY = 0;
     this.wheel = 0;

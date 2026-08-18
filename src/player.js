@@ -44,6 +44,16 @@ export function defaultStats() {
 /** Kritchansen får inte nå 100 % — då blir kritmultiplikatorn en gratisbonus. */
 export const CRIT_CAP = 0.6;
 
+/* Pareringens tajming. Fönstret är kort nog att kräva att man ser skottet
+   komma, och återladdningen lång nog att man inte kan spamma knappen. */
+export const PARRY_WINDOW = 0.28;
+export const PARRY_COOLDOWN = 0.85;
+
+/* Så länge efter en träff ligger regenen nere. Den ska läka mellan strider,
+   inte under dem — annars blir uthållighet gratis. Livstöld är vägen till
+   läkning mitt i striden, och den kräver att man faktiskt träffar något. */
+export const REGEN_DELAY = 4.0;
+
 export class Player {
   constructor(world) {
     this.world = world;
@@ -92,6 +102,11 @@ export class Player {
     this.comboTimer = 0;
     this.fireballCdMax = this.stats.fireballCool;
     this.fireballCd = 0;
+    // Parering (bara Vildheim): ett kort fönster där skott slås tillbaka.
+    this.parryTime = 0;      // > 0 medan fönstret är öppet
+    this.parryCd = 0;        // återladdning
+    this.parryFlash = 0;     // lyser till när något faktiskt pareras
+    this.regenBlock = 0;     // regenen sover en stund efter varje träff
   }
 
   get camForward() {
@@ -175,6 +190,10 @@ export class Player {
     // kurvan når aldrig noll skada hur många delar man än hittar.
     if (this.armor > 0) n /= 1 + this.armor * 0.06;
     this.hp -= n;
+    // Regenen tystnar en stund efter en träff. Utan den pausen tickar den
+    // mitt i striden och gör spelaren odödlig sent i en körning — man tålde
+    // 42 träffar och läkte igen var och en på tre sekunder.
+    this.regenBlock = REGEN_DELAY;
     this.invuln = 0.55;
     this.hitFlash = 1;
     this.shake = Math.min(1.2, this.shake + 0.35 + n * 0.012);
@@ -184,6 +203,18 @@ export class Player {
 
   heal(n) {
     this.hp = Math.min(this.stats.maxHp, this.hp + n);
+  }
+
+  /**
+   * Öppnar pareringsfönstret. Kort och med återladdning: pareringen ska vara
+   * ett beslut med tajming, inte något man håller inne. Träffar den inget
+   * kostar den ändå sin cooldown, så det finns en risk i att gissa.
+   */
+  tryParry() {
+    if (this.parryCd > 0 || this.parryTime > 0 || !this.alive) return false;
+    this.parryTime = PARRY_WINDOW;
+    this.parryCd = PARRY_COOLDOWN;
+    return true;
   }
 
   tryDash(input) {
@@ -358,12 +389,16 @@ export class Player {
     this.swingTime = Math.max(0, this.swingTime - dt);
     this.comboTimer = Math.max(0, this.comboTimer - dt);
     this.fireballCd = Math.max(0, this.fireballCd - dt);
+    this.parryTime = Math.max(0, this.parryTime - dt);
+    this.parryCd = Math.max(0, this.parryCd - dt);
+    this.parryFlash = Math.max(0, this.parryFlash - dt * 2.6);
     this.shake = Math.max(0, this.shake - dt * 2.4);
     if (this.dashCharges < st.dashMax) {
       this.dashTimer += dt;
       if (this.dashTimer >= st.dashRecharge) { this.dashTimer = 0; this.dashCharges++; }
     } else this.dashTimer = 0;
-    if (st.regen > 0 && this.hp < st.maxHp) this.heal(st.regen * dt);
+    this.regenBlock = Math.max(0, this.regenBlock - dt);
+    if (st.regen > 0 && this.regenBlock <= 0 && this.hp < st.maxHp) this.heal(st.regen * dt);
     this.droneAngle += dt * 1.6;
     this.droneTimer -= dt;
 
@@ -701,6 +736,24 @@ export class Player {
             col: [0.75, 1.0, 0.8], alpha: 0.8, drag: 0.3,
           });
         }
+      }
+    }
+
+    /*
+     * Pareringsskölden: en lysande skiva framför krigaren medan fönstret är
+     * öppet, som blossar upp vitt när något faktiskt slås tillbaka. Den ska
+     * synas tydligt — hela poängen är att man ser att tajmingen tog.
+     */
+    if (this.parryTime > 0 || this.parryFlash > 0) {
+      const t = Math.max(this.parryTime / 0.28, this.parryFlash);
+      const hit = this.parryFlash;
+      const col = [lerp(0.55, 1.0, hit), lerp(0.85, 0.97, hit), lerp(1.0, 0.7, hit)];
+      const r = (1.5 + hit * 1.1) * (0.7 + t * 0.4);
+      put(B.cyl, P(0, 1.35, 1.0), r, 0.1, r, col, Math.PI / 2, 0, 0, 0.8 + hit * 1.6);
+      for (let i = 0; i < 5; i++) {
+        const a = time * 5 + i * (TAU / 5);
+        put(B.octa, P(Math.cos(a) * r * 0.8, 1.35 + Math.sin(a) * r * 0.8, 1.05),
+          0.12, 0.3, 0.12, col, 0, a, 0, 1.0 + hit);
       }
     }
 

@@ -9,9 +9,9 @@ export const WARES = [
     base: 55, grow: 1.45, max: 12,
     apply: (st) => { st.damageBonus += 0.10; } },
 
-  { id: 'hp', icon: '🛡️', name: 'PLATING', desc: '+25 max HP · heals 25',
+  { id: 'hp', icon: '🛡️', name: 'PLATING', desc: '+15 max HP · heals 15',
     base: 45, grow: 1.35, max: 12,
-    apply: (st, p) => { st.maxHp += 25; p.heal(25); } },
+    apply: (st, p) => { st.maxHp += 15; p.heal(15); } },
 
   { id: 'speed', icon: '🥾', name: 'RUNNER BOOTS', desc: '+6% movement speed',
     base: 50, grow: 1.5, max: 6,
@@ -25,9 +25,9 @@ export const WARES = [
     base: 60, grow: 1.45, max: 8,
     apply: (st) => { st.crit += 0.05; } },
 
-  { id: 'regen', icon: '💚', name: 'NANITES', desc: '+1 HP per second',
+  { id: 'regen', icon: '💚', name: 'NANITES', desc: '+0.5 HP/s out of combat',
     base: 70, grow: 1.5, max: 5,
-    apply: (st) => { st.regen += 1.0; } },
+    apply: (st) => { st.regen += 0.5; } },
 
   { id: 'magnet', icon: '🧲', name: 'MAGNET RING', desc: '+50% pickup radius',
     base: 40, grow: 1.6, max: 4,
