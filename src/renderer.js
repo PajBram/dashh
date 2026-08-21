@@ -3,7 +3,7 @@ import { mat4, perspective, lookAt, multiply, invert, lerp, clamp, smoothstep, T
 import { initGL, makeProgram, uploadMesh, InstancedBatch, BillboardBatch } from './gl.js';
 import { TERRAIN_VS, TERRAIN_FS, INST_VS, INST_FS, SHADOW_VS, SHADOW_FS,
          PART_VS, PART_FS, SKY_VS, SKY_FS, WATER_VS, WATER_FS } from './shaders.js';
-import { sphere, box, cone, cylinder, disc, octahedron, grid } from './meshes.js';
+import { sphere, box, boxFlipped, cone, cylinder, disc, octahedron, grid } from './meshes.js';
 import { buildTerrainMesh, buildCityGroundMesh, scatterProps, cityProps } from './terrain.js';
 import { WORLD_SIZE, WATER_LEVEL, CITY_CELL, SEASON_ID, setWorld, setSeason } from './noise.js';
 
@@ -173,6 +173,7 @@ export class Renderer {
       cone: cone(12),
       cyl: cylinder(12),
       cylTaper: cylinder(10, 0.55),
+      boxFlipped: boxFlipped(),   // stenarnas ut-och-invända låda
       disc: disc(20),
       octa: octahedron(),
     };
@@ -392,7 +393,11 @@ export class Renderer {
     const props = scatterProps();
     const trunks = new InstancedBatch(gl, m.cylTaper, 2048);
     const leaves = new InstancedBatch(gl, m.cone, 2048);
-    const rocks = new InstancedBatch(gl, m.box, 2048);
+    // Stenarna ritas ut och in, på Pajs begäran: vänd geometri och normaler,
+    // och utan baksideskullning så de inte reduceras till sitt eget innanmäte.
+    const rocks = new InstancedBatch(gl, m.boxFlipped, 2048);
+    rocks.noCull = true;
+    const bark = new InstancedBatch(gl, m.box, 1024);   // björknäver — vanlig låda
     const crystals = new InstancedBatch(gl, m.octa, 256);
     const tufts = new InstancedBatch(gl, m.cone, 6144);
     const canopy = new InstancedBatch(gl, m.sphere, 2048);   // lövkronor och buskar
@@ -419,7 +424,7 @@ export class Renderer {
         const h = 4.6 * s;
         trunks.push(t.x, t.y + h * 0.5, t.z, 0.30 * s, h, 0.30 * s, t.trunk, lean, t.rot, 0, 0);
         for (let i = 0; i < 3; i++) {
-          rocks.push(t.x, t.y + h * (0.3 + i * 0.22), t.z, 0.34 * s, 0.09 * s, 0.34 * s,
+          bark.push(t.x, t.y + h * (0.3 + i * 0.22), t.z, 0.34 * s, 0.09 * s, 0.34 * s,
             [0.20, 0.19, 0.18], 0, t.rot + i, 0, 0);
         }
         canopy.push(t.x, t.y + h + 0.9 * s, t.z, 2.3 * s, 2.0 * s, 2.3 * s, t.leaf, 0, t.rot, 0, 0, 0.5 * s);
@@ -495,7 +500,7 @@ export class Renderer {
     }
     return {
       terrain: uploadMesh(gl, buildTerrainMesh(200)),
-      static: [trunks, leaves, rocks, crystals, tufts, canopy, petals, logsB],
+      static: [trunks, leaves, rocks, bark, crystals, tufts, canopy, petals, logsB],
       props,
     };
   }
@@ -605,7 +610,15 @@ export class Renderer {
     this.pInst.use();
     this.applyEnv(this.pInst, env, cam.pos);
     this.pInst.f('uTime', time).v2('uWind', env.wind[0], env.wind[1]);
-    for (const b of this.static) b.draw();
+    for (const b of this.static) {
+      // Ut-och-invända batchar (stenarna) ritas utan baksideskullning —
+      // annars skulle man se rakt igenom dem in i deras bortre vägg.
+      if (b.noCull) {
+        gl.disable(gl.CULL_FACE);
+        b.draw();
+        gl.enable(gl.CULL_FACE);
+      } else b.draw();
+    }
     for (const k in this.dyn) this.dyn[k].draw();
 
     // --- markskuggor

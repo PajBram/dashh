@@ -30,6 +30,24 @@ export function sphere(seg = 18, rings = 12) {
   return mesh(p, n, idx);
 }
 
+/**
+ * Samma låda som `box()`, men ut och in: varje triangel vänds och normalerna
+ * pekar inåt. Stenarna i Vildheim använder den — de ritas dessutom utan
+ * baksideskullning, annars skulle bara insidan av deras bortre vägg synas.
+ * Det är en avsiktligt vrång look, inte en bugg.
+ */
+export function boxFlipped() {
+  const m = box();
+  for (let i = 0; i < m.normals.length; i++) m.normals[i] = -m.normals[i];
+  // byt håll på varje triangel så framsidan blir baksida
+  for (let i = 0; i < m.indices.length; i += 3) {
+    const t = m.indices[i + 1];
+    m.indices[i + 1] = m.indices[i + 2];
+    m.indices[i + 2] = t;
+  }
+  return m;
+}
+
 export function box() {
   const p = [], n = [], idx = [];
   const faces = [
